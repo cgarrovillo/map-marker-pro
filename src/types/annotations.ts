@@ -61,3 +61,12 @@ export const FLOW_TYPES: Record<FlowType, { label: string; icon: string }> = {
   ingress: { label: 'Ingress Flow', icon: 'ArrowRight' },
   egress: { label: 'Egress / Emergency', icon: 'LogOut' },
 };
+
+export interface FloorPlanEvent {
+  id: string;
+  name: string;
+  image: string | null;
+  annotations: Annotation[];
+  createdAt: number;
+  updatedAt: number;
+}

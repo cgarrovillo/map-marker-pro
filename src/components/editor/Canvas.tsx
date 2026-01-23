@@ -1,5 +1,7 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
-import { Upload, Image as ImageIcon } from 'lucide-react';
+import { Upload, Image as ImageIcon, RefreshCw } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   Annotation,
   AnnotationCategory,
@@ -170,6 +172,37 @@ export function Canvas({
     }
   };
 
+  const uploadOverlay = (
+    <label className="cursor-pointer">
+      <input
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={handleFileInput}
+      />
+      <div className="flex flex-col items-center gap-4 p-8 rounded-xl border-2 border-dashed border-border hover:border-primary hover:bg-secondary/30 transition-all">
+        <div className="w-16 h-16 rounded-full bg-secondary flex items-center justify-center">
+          {isDragging ? (
+            <ImageIcon className="w-8 h-8 text-primary" />
+          ) : (
+            <Upload className="w-8 h-8 text-muted-foreground" />
+          )}
+        </div>
+        <div className="text-center">
+          <p className="text-lg font-medium">
+            {isDragging ? 'Drop your floor plan here' : 'Upload a floor plan'}
+          </p>
+          <p className="text-sm text-muted-foreground mt-1">
+            Drag & drop or click to browse
+          </p>
+          <p className="text-xs text-muted-foreground mt-2">
+            Supports PNG, JPG, SVG
+          </p>
+        </div>
+      </div>
+    </label>
+  );
+
   if (!image) {
     return (
       <div
@@ -181,34 +214,7 @@ export function Canvas({
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
       >
-        <label className="cursor-pointer">
-          <input
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={handleFileInput}
-          />
-          <div className="flex flex-col items-center gap-4 p-8 rounded-xl border-2 border-dashed border-border hover:border-primary hover:bg-secondary/30 transition-all">
-            <div className="w-16 h-16 rounded-full bg-secondary flex items-center justify-center">
-              {isDragging ? (
-                <ImageIcon className="w-8 h-8 text-primary" />
-              ) : (
-                <Upload className="w-8 h-8 text-muted-foreground" />
-              )}
-            </div>
-            <div className="text-center">
-              <p className="text-lg font-medium">
-                {isDragging ? 'Drop your floor plan here' : 'Upload a floor plan'}
-              </p>
-              <p className="text-sm text-muted-foreground mt-1">
-                Drag & drop or click to browse
-              </p>
-              <p className="text-xs text-muted-foreground mt-2">
-                Supports PNG, JPG, SVG
-              </p>
-            </div>
-          </div>
-        </label>
+        {uploadOverlay}
       </div>
     );
   }
@@ -219,8 +225,43 @@ export function Canvas({
       className="flex-1 relative overflow-hidden canvas-grid"
       onClick={handleCanvasClick}
       onMouseMove={handleMouseMove}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
       style={{ cursor: getCursor() }}
     >
+      {/* Replace image button */}
+      <div className="absolute top-3 right-3 z-10">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <label>
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleFileInput}
+              />
+              <Button variant="secondary" size="sm" className="cursor-pointer" asChild>
+                <span>
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  Replace Image
+                </span>
+              </Button>
+            </label>
+          </TooltipTrigger>
+          <TooltipContent>Upload a new floor plan image</TooltipContent>
+        </Tooltip>
+      </div>
+
+      {isDragging && (
+        <div className="absolute inset-0 z-20 bg-primary/10 backdrop-blur-sm flex items-center justify-center border-2 border-dashed border-primary">
+          <div className="text-center">
+            <ImageIcon className="w-12 h-12 mx-auto mb-2 text-primary" />
+            <p className="text-lg font-medium text-primary">Drop to replace floor plan</p>
+          </div>
+        </div>
+      )}
+
       <img
         src={image}
         alt="Floor plan"
