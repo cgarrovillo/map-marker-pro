@@ -13,6 +13,10 @@ export default {
       },
     },
     extend: {
+      fontFamily: {
+        sans: ['Inter', 'system-ui', 'sans-serif'],
+        mono: ['JetBrains Mono', 'monospace'],
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
@@ -47,6 +51,29 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        canvas: {
+          bg: "hsl(var(--canvas-bg))",
+          grid: "hsl(var(--canvas-grid))",
+        },
+        signage: {
+          DEFAULT: "hsl(var(--signage-primary))",
+          ticket: "hsl(var(--signage-ticket))",
+          vip: "hsl(var(--signage-vip))",
+          alcohol: "hsl(var(--signage-alcohol))",
+          accessibility: "hsl(var(--signage-accessibility))",
+          washroom: "hsl(var(--signage-washroom))",
+          area: "hsl(var(--signage-area))",
+        },
+        barrier: {
+          DEFAULT: "hsl(var(--barrier-primary))",
+          stanchion: "hsl(var(--barrier-stanchion))",
+          drape: "hsl(var(--barrier-drape))",
+        },
+        flow: {
+          DEFAULT: "hsl(var(--flow-primary))",
+          ingress: "hsl(var(--flow-ingress))",
+          egress: "hsl(var(--flow-egress))",
+        },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
           foreground: "hsl(var(--sidebar-foreground))",
@@ -65,20 +92,12 @@ export default {
       },
       keyframes: {
         "accordion-down": {
-          from: {
-            height: "0",
-          },
-          to: {
-            height: "var(--radix-accordion-content-height)",
-          },
+          from: { height: "0" },
+          to: { height: "var(--radix-accordion-content-height)" },
         },
         "accordion-up": {
-          from: {
-            height: "var(--radix-accordion-content-height)",
-          },
-          to: {
-            height: "0",
-          },
+          from: { height: "var(--radix-accordion-content-height)" },
+          to: { height: "0" },
         },
       },
       animation: {
