@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Calendar, Trash2, MoreHorizontal, Edit2 } from 'lucide-react';
+import { Plus, Calendar, Trash2, MoreHorizontal, Edit2, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -16,16 +16,19 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { FloorPlanEvent } from '@/types/annotations';
+import { Tables } from '@/integrations/supabase/types';
 import { cn } from '@/lib/utils';
 
+type Event = Tables<'events'>;
+
 interface EventsPanelProps {
-  events: FloorPlanEvent[];
+  events: Event[];
   activeEventId: string | null;
   onSelectEvent: (id: string) => void;
   onCreateEvent: (name: string) => void;
   onDeleteEvent: (id: string) => void;
   onRenameEvent: (id: string, name: string) => void;
+  loading?: boolean;
 }
 
 export function EventsPanel({
@@ -35,6 +38,7 @@ export function EventsPanel({
   onCreateEvent,
   onDeleteEvent,
   onRenameEvent,
+  loading = false,
 }: EventsPanelProps) {
   const [isCreating, setIsCreating] = useState(false);
   const [newEventName, setNewEventName] = useState('');
@@ -57,9 +61,16 @@ export function EventsPanel({
     }
   };
 
-  const startRename = (event: FloorPlanEvent) => {
+  const startRename = (event: Event) => {
     setRenamingEventId(event.id);
     setRenameValue(event.name);
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString(undefined, {
+      month: 'short',
+      day: 'numeric',
+    });
   };
 
   return (
@@ -75,6 +86,7 @@ export function EventsPanel({
             size="icon"
             className="h-7 w-7"
             onClick={() => setIsCreating(true)}
+            disabled={loading}
           >
             <Plus className="w-4 h-4" />
           </Button>
@@ -86,7 +98,11 @@ export function EventsPanel({
 
       <ScrollArea className="flex-1">
         <div className="p-2 space-y-1">
-          {events.length === 0 ? (
+          {loading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : events.length === 0 ? (
             <div className="text-center py-8 px-4">
               <Calendar className="w-10 h-10 mx-auto mb-3 text-muted-foreground/50" />
               <p className="text-sm text-muted-foreground">No events yet</p>
@@ -109,9 +125,7 @@ export function EventsPanel({
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">{event.name}</p>
                   <p className="text-xs text-muted-foreground">
-                    {event.annotations.length} annotation
-                    {event.annotations.length !== 1 && 's'}
-                    {event.image && ' • Has floor plan'}
+                    Created {formatDate(event.created_at)}
                   </p>
                 </div>
                 <DropdownMenu>

@@ -6,11 +6,7 @@ import {
   LayerVisibility,
   SubLayerVisibility,
   EditorMode,
-  ToolMode,
   Point,
-  SignageType,
-  BarrierType,
-  FlowType,
 } from '@/types/annotations';
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
@@ -37,7 +33,6 @@ const initialSubLayerVisibility: SubLayerVisibility = {
 export function useAnnotations() {
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
   const [mode, setMode] = useState<EditorMode>('edit');
-  const [toolMode, setToolMode] = useState<ToolMode>('marker');
   const [selectedCategory, setSelectedCategory] = useState<AnnotationCategory>('signage');
   const [selectedType, setSelectedType] = useState<AnnotationType>('ticket');
   const [focusedCategory, setFocusedCategory] = useState<AnnotationCategory | null>(null);
@@ -138,8 +133,6 @@ export function useAnnotations() {
     annotations,
     mode,
     setMode,
-    toolMode,
-    setToolMode,
     selectedCategory,
     selectedType,
     selectAnnotationType,

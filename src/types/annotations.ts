@@ -34,7 +34,12 @@ export interface SubLayerVisibility {
 
 export type EditorMode = 'edit' | 'view';
 
-export type ToolMode = 'select' | 'marker' | 'line' | 'delete';
+// Helper to determine if an annotation type uses lines or markers
+export const isLineAnnotation = (category: AnnotationCategory, type: AnnotationType): boolean => {
+  if (category === 'flow') return true; // All flows are lines
+  if (category === 'barrier' && type === 'drape') return true; // Pipe & drape is a line
+  return false; // Everything else is a marker
+};
 
 export interface AnnotationConfig {
   category: AnnotationCategory;

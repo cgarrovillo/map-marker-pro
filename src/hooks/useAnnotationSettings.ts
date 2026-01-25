@@ -6,7 +6,6 @@ import {
   LayerVisibility,
   SubLayerVisibility,
   EditorMode,
-  ToolMode,
   Point,
 } from '@/types/annotations';
 
@@ -31,10 +30,10 @@ const initialSubLayerVisibility: SubLayerVisibility = {
 
 export function useAnnotationSettings() {
   const [mode, setMode] = useState<EditorMode>('edit');
-  const [toolMode, setToolMode] = useState<ToolMode>('marker');
   const [selectedCategory, setSelectedCategory] = useState<AnnotationCategory>('signage');
   const [selectedType, setSelectedType] = useState<AnnotationType>('ticket');
   const [focusedCategory, setFocusedCategory] = useState<AnnotationCategory | null>(null);
+  const [selectedAnnotationId, setSelectedAnnotationId] = useState<string | null>(null);
   const [layerVisibility, setLayerVisibility] = useState<LayerVisibility>({
     signage: true,
     barrier: true,
@@ -84,16 +83,25 @@ export function useAnnotationSettings() {
     []
   );
 
+  // Clear selection when switching modes
+  const handleSetMode = useCallback((newMode: EditorMode) => {
+    setMode(newMode);
+    if (newMode === 'view') {
+      setSelectedAnnotationId(null);
+      setPendingLine(null);
+    }
+  }, []);
+
   return {
     mode,
-    setMode,
-    toolMode,
-    setToolMode,
+    setMode: handleSetMode,
     selectedCategory,
     selectedType,
     selectAnnotationType,
     focusedCategory,
     setFocusedCategory,
+    selectedAnnotationId,
+    setSelectedAnnotationId,
     layerVisibility,
     subLayerVisibility,
     toggleLayerVisibility,

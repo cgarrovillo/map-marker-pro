@@ -1,40 +1,62 @@
-import { useState, useCallback } from 'react';
-import { Toolbar } from './Toolbar';
+import { useCallback, useEffect } from 'react';
 import { AnnotationPanel } from './AnnotationPanel';
 import { LayersPanel } from './LayersPanel';
 import { Canvas } from './Canvas';
 import { EventsPanel } from './EventsPanel';
-import { useEvents } from '@/hooks/useEvents';
+import { useSupabaseEvents } from '@/hooks/useSupabaseEvents';
+import { useVenueLayouts } from '@/hooks/useVenueLayouts';
 import { useAnnotationSettings } from '@/hooks/useAnnotationSettings';
+import { useOrganization } from '@/hooks/useOrganization';
+import { useAuthContext } from '@/components/auth/AuthProvider';
 import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { LogOut, Building2, Eye, Edit3, Download, Upload, RotateCcw } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 export function FloorPlanEditor() {
+  const { signOut } = useAuthContext();
+  const { organization, currentUser } = useOrganization();
+
   const {
     events,
     activeEvent,
     activeEventId,
     setActiveEventId,
+    loading: eventsLoading,
     createEvent,
     deleteEvent,
     renameEvent,
-    setEventImage,
+  } = useSupabaseEvents();
+
+  const {
+    layouts,
+    activeLayout,
+    activeLayoutId,
+    setActiveLayoutId,
+    loading: layoutsLoading,
+    createLayout,
+    deleteLayout,
+    uploadImage,
     addAnnotation,
     deleteAnnotation,
+    updateAnnotation,
     clearAnnotations,
-    exportEvent,
-    importEvent,
-  } = useEvents();
+    renameLayout,
+    getAnnotations,
+    getImageUrl,
+  } = useVenueLayouts(activeEventId);
 
   const {
     mode,
     setMode,
-    toolMode,
-    setToolMode,
     selectedCategory,
     selectedType,
     selectAnnotationType,
     focusedCategory,
     setFocusedCategory,
+    selectedAnnotationId,
+    setSelectedAnnotationId,
     layerVisibility,
     subLayerVisibility,
     toggleLayerVisibility,
@@ -44,101 +66,173 @@ export function FloorPlanEditor() {
     setPendingLine,
   } = useAnnotationSettings();
 
+  // Auto-create a layout when selecting an event with no layouts
+  useEffect(() => {
+    if (activeEventId && !layoutsLoading && layouts.length === 0) {
+      createLayout('Floor Plan').catch(console.error);
+    }
+  }, [activeEventId, layoutsLoading, layouts.length, createLayout]);
+
+  const annotations = getAnnotations(activeLayout);
+  const imageUrl = getImageUrl(activeLayout?.image_path ?? null);
+
   const handleImageUpload = useCallback(
-    (file: File) => {
-      if (!activeEventId) {
+    async (file: File) => {
+      if (!activeLayoutId) {
         toast.error('Please select or create an event first');
         return;
       }
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setEventImage(activeEventId, e.target?.result as string);
+      try {
+        await uploadImage(activeLayoutId, file);
         toast.success('Floor plan uploaded successfully');
-      };
-      reader.readAsDataURL(file);
+      } catch (error) {
+        toast.error('Failed to upload floor plan');
+        console.error(error);
+      }
     },
-    [activeEventId, setEventImage]
+    [activeLayoutId, uploadImage]
   );
 
   const handleAddAnnotation = useCallback(
-    (points: { x: number; y: number }[], label?: string) => {
-      if (!activeEventId) return;
-      addAnnotation(activeEventId, selectedCategory, selectedType, points, label);
+    async (points: { x: number; y: number }[], label?: string) => {
+      if (!activeLayoutId) return;
+      try {
+        await addAnnotation(activeLayoutId, selectedCategory, selectedType, points, label);
+      } catch (error) {
+        toast.error('Failed to add annotation');
+        console.error(error);
+      }
     },
-    [activeEventId, selectedCategory, selectedType, addAnnotation]
+    [activeLayoutId, selectedCategory, selectedType, addAnnotation]
   );
 
   const handleDeleteAnnotation = useCallback(
-    (id: string) => {
-      if (!activeEventId) return;
-      deleteAnnotation(activeEventId, id);
+    async (id: string) => {
+      if (!activeLayoutId) return;
+      try {
+        await deleteAnnotation(activeLayoutId, id);
+      } catch (error) {
+        toast.error('Failed to delete annotation');
+        console.error(error);
+      }
     },
-    [activeEventId, deleteAnnotation]
+    [activeLayoutId, deleteAnnotation]
+  );
+
+  const handleUpdateAnnotation = useCallback(
+    async (id: string, updates: Partial<{ points: { x: number; y: number }[] }>) => {
+      if (!activeLayoutId) return;
+      try {
+        await updateAnnotation(activeLayoutId, id, updates);
+      } catch (error) {
+        toast.error('Failed to update annotation');
+        console.error(error);
+      }
+    },
+    [activeLayoutId, updateAnnotation]
   );
 
   const handleExport = useCallback(() => {
-    if (!activeEventId) {
+    if (!activeLayout || !activeEvent) {
       toast.error('Please select an event first');
       return;
     }
-    const data = exportEvent(activeEventId);
-    if (!data) return;
+    const exportData = {
+      event: activeEvent,
+      layout: activeLayout,
+      annotations: getAnnotations(activeLayout),
+    };
+    const data = JSON.stringify(exportData, null, 2);
     const blob = new Blob([data], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${activeEvent?.name || 'event'}-floor-plan.json`;
+    a.download = `${activeEvent.name}-floor-plan.json`;
     a.click();
     URL.revokeObjectURL(url);
     toast.success('Event exported');
-  }, [activeEventId, activeEvent, exportEvent]);
+  }, [activeLayout, activeEvent, getAnnotations]);
 
   const handleImport = useCallback(() => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.json';
-    input.onchange = (e) => {
-      const file = (e.target as HTMLInputElement).files?.[0];
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          const result = importEvent(e.target?.result as string);
-          if (result) {
-            toast.success('Event imported');
-          } else {
-            toast.error('Invalid event file');
-          }
-        };
-        reader.readAsText(file);
-      }
-    };
-    input.click();
-  }, [importEvent]);
+    toast.info('Import feature coming soon');
+  }, []);
 
-  const handleClear = useCallback(() => {
-    if (!activeEventId || !activeEvent) {
+  const handleClear = useCallback(async () => {
+    if (!activeLayoutId || !activeLayout) {
       toast.error('Please select an event first');
       return;
     }
-    if (activeEvent.annotations.length === 0) {
+    const currentAnnotations = getAnnotations(activeLayout);
+    if (currentAnnotations.length === 0) {
       toast.info('No annotations to clear');
       return;
     }
     if (confirm('Are you sure you want to clear all annotations?')) {
-      clearAnnotations(activeEventId);
-      toast.success('Annotations cleared');
+      try {
+        await clearAnnotations(activeLayoutId);
+        toast.success('Annotations cleared');
+      } catch (error) {
+        toast.error('Failed to clear annotations');
+        console.error(error);
+      }
     }
-  }, [activeEventId, activeEvent, clearAnnotations]);
+  }, [activeLayoutId, activeLayout, clearAnnotations, getAnnotations]);
+
+  const handleCreateEvent = useCallback(
+    async (name: string) => {
+      try {
+        const event = await createEvent(name);
+        if (event) {
+          toast.success('Event created');
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Failed to create event';
+        toast.error(message);
+        console.error(error);
+      }
+    },
+    [createEvent]
+  );
 
   const handleDeleteEvent = useCallback(
-    (id: string) => {
+    async (id: string) => {
       if (confirm('Are you sure you want to delete this event?')) {
-        deleteEvent(id);
-        toast.success('Event deleted');
+        try {
+          await deleteEvent(id);
+          toast.success('Event deleted');
+        } catch (error) {
+          toast.error('Failed to delete event');
+          console.error(error);
+        }
       }
     },
     [deleteEvent]
   );
+
+  const handleRenameEvent = useCallback(
+    async (id: string, name: string) => {
+      try {
+        await renameEvent(id, name);
+        toast.success('Event renamed');
+      } catch (error) {
+        toast.error('Failed to rename event');
+        console.error(error);
+      }
+    },
+    [renameEvent]
+  );
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      toast.success('Signed out');
+    } catch (error) {
+      toast.error('Failed to sign out');
+      console.error(error);
+    }
+  };
+
+  const isLoading = eventsLoading || layoutsLoading;
 
   return (
     <div className="h-screen flex flex-col bg-background">
@@ -158,38 +252,119 @@ export function FloorPlanEditor() {
           </div>
           <span className="font-semibold text-lg">FloorPlan Pro</span>
         </div>
-        <div className="flex-1 flex items-center justify-center">
+
+        {/* Edit/View Mode Toggle */}
+        <div className="ml-6 flex items-center bg-secondary rounded-lg p-1">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={() => setMode('edit')}
+                className={cn(
+                  'flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all',
+                  mode === 'edit'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'text-muted-foreground hover:text-foreground'
+                )}
+              >
+                <Edit3 className="w-4 h-4" />
+                Edit
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>Edit annotations</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={() => setMode('view')}
+                className={cn(
+                  'flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all',
+                  mode === 'view'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'text-muted-foreground hover:text-foreground'
+                )}
+              >
+                <Eye className="w-4 h-4" />
+                View
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>View only mode</TooltipContent>
+          </Tooltip>
+        </div>
+
+        <div className="flex-1 flex items-center justify-center gap-4">
+          {organization && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Building2 className="w-4 h-4" />
+              <span>{organization.name}</span>
+            </div>
+          )}
           {activeEvent && (
-            <span className="text-sm font-medium text-muted-foreground">
-              {activeEvent.name}
-            </span>
+            <>
+              <span className="text-muted-foreground/50">•</span>
+              <span className="text-sm font-medium text-foreground">
+                {activeEvent.name}
+              </span>
+            </>
           )}
         </div>
-        <span className="text-xs text-muted-foreground font-mono">
-          {activeEvent?.annotations.length || 0} annotation
-          {(activeEvent?.annotations.length || 0) !== 1 && 's'}
-        </span>
-      </header>
 
-      <Toolbar
-        mode={mode}
-        toolMode={toolMode}
-        onModeChange={setMode}
-        onToolChange={setToolMode}
-        onExport={handleExport}
-        onImport={handleImport}
-        onClear={handleClear}
-        hasImage={!!activeEvent?.image}
-      />
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground font-mono mr-2">
+            {annotations.length} annotation{annotations.length !== 1 && 's'}
+          </span>
+          
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" onClick={handleImport}>
+                <Upload className="w-4 h-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Import annotations</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" onClick={handleExport}>
+                <Download className="w-4 h-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Export annotations</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" onClick={handleClear}>
+                <RotateCcw className="w-4 h-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Clear all annotations</TooltipContent>
+          </Tooltip>
+
+          <div className="w-px h-6 bg-border mx-1" />
+
+          {currentUser && (
+            <span className="text-xs text-muted-foreground">
+              {currentUser.email}
+            </span>
+          )}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" onClick={handleSignOut}>
+                <LogOut className="w-4 h-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Sign out</TooltipContent>
+          </Tooltip>
+        </div>
+      </header>
 
       <div className="flex-1 flex overflow-hidden">
         <EventsPanel
           events={events}
           activeEventId={activeEventId}
           onSelectEvent={setActiveEventId}
-          onCreateEvent={createEvent}
+          onCreateEvent={handleCreateEvent}
           onDeleteEvent={handleDeleteEvent}
-          onRenameEvent={renameEvent}
+          onRenameEvent={handleRenameEvent}
+          loading={eventsLoading}
         />
 
         <AnnotationPanel
@@ -199,21 +374,30 @@ export function FloorPlanEditor() {
           isEditMode={mode === 'edit'}
         />
 
-        {activeEvent ? (
+        {isLoading ? (
+          <div className="flex-1 flex items-center justify-center canvas-grid">
+            <div className="flex flex-col items-center gap-4">
+              <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+              <p className="text-sm text-muted-foreground">Loading...</p>
+            </div>
+          </div>
+        ) : activeEvent && activeLayout ? (
           <Canvas
-            image={activeEvent.image}
+            image={imageUrl}
             onImageUpload={handleImageUpload}
-            annotations={activeEvent.annotations}
+            annotations={annotations}
             isAnnotationVisible={isAnnotationVisible}
             focusedCategory={focusedCategory}
-            toolMode={toolMode}
             isEditMode={mode === 'edit'}
             onAddAnnotation={handleAddAnnotation}
             onDeleteAnnotation={handleDeleteAnnotation}
+            onUpdateAnnotation={handleUpdateAnnotation}
             selectedCategory={selectedCategory}
             selectedType={selectedType}
             pendingLine={pendingLine}
             setPendingLine={setPendingLine}
+            selectedAnnotationId={selectedAnnotationId}
+            setSelectedAnnotationId={setSelectedAnnotationId}
           />
         ) : (
           <div className="flex-1 flex items-center justify-center canvas-grid">
@@ -247,7 +431,7 @@ export function FloorPlanEditor() {
           onToggleSubLayer={toggleSubLayerVisibility}
           focusedCategory={focusedCategory}
           onFocusCategory={setFocusedCategory}
-          annotations={activeEvent?.annotations || []}
+          annotations={annotations}
         />
       </div>
     </div>

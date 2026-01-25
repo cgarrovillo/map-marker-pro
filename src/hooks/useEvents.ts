@@ -96,6 +96,25 @@ export function useEvents() {
     );
   }, []);
 
+  const updateAnnotation = useCallback(
+    (eventId: string, annotationId: string, updates: Partial<Annotation>) => {
+      setEvents((prev) =>
+        prev.map((e) =>
+          e.id === eventId
+            ? {
+                ...e,
+                annotations: e.annotations.map((a) =>
+                  a.id === annotationId ? { ...a, ...updates } : a
+                ),
+                updatedAt: Date.now(),
+              }
+            : e
+        )
+      );
+    },
+    []
+  );
+
   const clearAnnotations = useCallback((eventId: string) => {
     setEvents((prev) =>
       prev.map((e) =>
@@ -143,6 +162,7 @@ export function useEvents() {
     setEventImage,
     addAnnotation,
     deleteAnnotation,
+    updateAnnotation,
     clearAnnotations,
     exportEvent,
     importEvent,

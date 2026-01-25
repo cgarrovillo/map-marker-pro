@@ -22,3 +22,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Always track .cursor directory (contains project rules for AI)
+!.cursor
+
+# Always track .env.local
+!.env.local

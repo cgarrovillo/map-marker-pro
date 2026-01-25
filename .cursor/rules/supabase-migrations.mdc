@@ -1,0 +1,45 @@
+---
+description: Supabase database migration rules - NEVER suggest destructive commands
+globs: supabase/**/*
+alwaysApply: true
+---
+
+# Supabase Migration Rules
+
+## CRITICAL: Never Suggest Destructive Commands
+
+**NEVER suggest these commands** - they destroy all data:
+
+```bash
+# ❌ FORBIDDEN - Destroys all data
+supabase db reset
+supabase db push --reset
+```
+
+## Safe Migration Commands
+
+**Always use these instead:**
+
+```bash
+# ✅ Apply pending migrations (preserves data)
+supabase migration up
+
+# ✅ Check migration status
+supabase migration list
+
+# ✅ Create a new migration
+supabase migration new <migration_name>
+```
+
+## Migration Workflow
+
+1. **Create new migration**: `supabase migration new descriptive_name`
+2. **Edit the migration file** in `supabase/migrations/`
+3. **Apply it**: `supabase migration up`
+
+## When Schema Changes Are Needed
+
+- Create a NEW migration file for changes
+- Never modify already-applied migrations
+- Use ALTER TABLE, not DROP/CREATE
+- Write backward-compatible changes when possible
