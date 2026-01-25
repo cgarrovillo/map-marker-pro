@@ -3,22 +3,25 @@ import { useState } from 'react';
 import {
   AnnotationCategory,
   AnnotationType,
-  LayerVisibility,
-  SubLayerVisibility,
   SIGNAGE_TYPES,
   BARRIER_TYPES,
   FLOW_TYPES,
   Annotation,
 } from '@/types/annotations';
 import { cn } from '@/lib/utils';
+import { useAppSelector, useAppDispatch } from '@/store/hooks';
+import {
+  selectLayerVisibility,
+  selectSubLayerVisibility,
+  selectFocusedCategory,
+} from '@/store/selectors';
+import {
+  toggleLayerVisibility,
+  toggleSubLayerVisibility,
+  setFocusedCategory,
+} from '@/store/slices/uiSlice';
 
 interface LayersPanelProps {
-  layerVisibility: LayerVisibility;
-  subLayerVisibility: SubLayerVisibility;
-  onToggleLayer: (category: AnnotationCategory) => void;
-  onToggleSubLayer: (category: AnnotationCategory, type: AnnotationType) => void;
-  focusedCategory: AnnotationCategory | null;
-  onFocusCategory: (category: AnnotationCategory | null) => void;
   annotations: Annotation[];
 }
 
@@ -131,19 +134,28 @@ function SubLayerRow({
   );
 }
 
-export function LayersPanel({
-  layerVisibility,
-  subLayerVisibility,
-  onToggleLayer,
-  onToggleSubLayer,
-  focusedCategory,
-  onFocusCategory,
-  annotations,
-}: LayersPanelProps) {
+export function LayersPanel({ annotations }: LayersPanelProps) {
+  const dispatch = useAppDispatch();
+  const layerVisibility = useAppSelector(selectLayerVisibility);
+  const subLayerVisibility = useAppSelector(selectSubLayerVisibility);
+  const focusedCategory = useAppSelector(selectFocusedCategory);
+
   const countByType = (category: AnnotationCategory, type?: AnnotationType) => {
     return annotations.filter(
       (a) => a.category === category && (type ? a.type === type : true)
     ).length;
+  };
+
+  const handleToggleLayer = (category: AnnotationCategory) => {
+    dispatch(toggleLayerVisibility(category));
+  };
+
+  const handleToggleSubLayer = (category: AnnotationCategory, type: AnnotationType) => {
+    dispatch(toggleSubLayerVisibility({ category, type }));
+  };
+
+  const handleFocusCategory = (category: AnnotationCategory | null) => {
+    dispatch(setFocusedCategory(category));
   };
 
   return (
@@ -160,9 +172,9 @@ export function LayersPanel({
           label="Signages"
           visible={layerVisibility.signage}
           focused={focusedCategory === 'signage'}
-          onToggle={() => onToggleLayer('signage')}
+          onToggle={() => handleToggleLayer('signage')}
           onFocus={() =>
-            onFocusCategory(focusedCategory === 'signage' ? null : 'signage')
+            handleFocusCategory(focusedCategory === 'signage' ? null : 'signage')
           }
           colorClass="bg-signage"
           count={countByType('signage')}
@@ -173,7 +185,7 @@ export function LayersPanel({
               type={type}
               label={config.label}
               visible={subLayerVisibility.signage[type as keyof typeof subLayerVisibility.signage]}
-              onToggle={() => onToggleSubLayer('signage', type as AnnotationType)}
+              onToggle={() => handleToggleSubLayer('signage', type as AnnotationType)}
               colorClass={`bg-signage-${type}`}
               count={countByType('signage', type as AnnotationType)}
             />
@@ -184,9 +196,9 @@ export function LayersPanel({
           label="Barriers"
           visible={layerVisibility.barrier}
           focused={focusedCategory === 'barrier'}
-          onToggle={() => onToggleLayer('barrier')}
+          onToggle={() => handleToggleLayer('barrier')}
           onFocus={() =>
-            onFocusCategory(focusedCategory === 'barrier' ? null : 'barrier')
+            handleFocusCategory(focusedCategory === 'barrier' ? null : 'barrier')
           }
           colorClass="bg-barrier"
           count={countByType('barrier')}
@@ -197,7 +209,7 @@ export function LayersPanel({
               type={type}
               label={config.label}
               visible={subLayerVisibility.barrier[type as keyof typeof subLayerVisibility.barrier]}
-              onToggle={() => onToggleSubLayer('barrier', type as AnnotationType)}
+              onToggle={() => handleToggleSubLayer('barrier', type as AnnotationType)}
               colorClass={`bg-barrier-${type}`}
               count={countByType('barrier', type as AnnotationType)}
             />
@@ -208,9 +220,9 @@ export function LayersPanel({
           label="Crowd Flow"
           visible={layerVisibility.flow}
           focused={focusedCategory === 'flow'}
-          onToggle={() => onToggleLayer('flow')}
+          onToggle={() => handleToggleLayer('flow')}
           onFocus={() =>
-            onFocusCategory(focusedCategory === 'flow' ? null : 'flow')
+            handleFocusCategory(focusedCategory === 'flow' ? null : 'flow')
           }
           colorClass="bg-flow"
           count={countByType('flow')}
@@ -221,7 +233,7 @@ export function LayersPanel({
               type={type}
               label={config.label}
               visible={subLayerVisibility.flow[type as keyof typeof subLayerVisibility.flow]}
-              onToggle={() => onToggleSubLayer('flow', type as AnnotationType)}
+              onToggle={() => handleToggleSubLayer('flow', type as AnnotationType)}
               colorClass={`bg-flow-${type}`}
               count={countByType('flow', type as AnnotationType)}
             />

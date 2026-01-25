@@ -22,8 +22,12 @@ import {
   SignageType,
   BarrierType,
   FlowType,
+  Annotation,
 } from '@/types/annotations';
 import { cn } from '@/lib/utils';
+import { useAppSelector, useAppDispatch } from '@/store/hooks';
+import { selectSelectedCategory, selectSelectedType, selectIsEditMode } from '@/store/selectors';
+import { selectAnnotationType } from '@/store/slices/uiSlice';
 
 const ICONS = {
   Ticket,
@@ -39,10 +43,7 @@ const ICONS = {
 };
 
 interface AnnotationPanelProps {
-  selectedCategory: AnnotationCategory;
-  selectedType: AnnotationType;
-  onSelect: (category: AnnotationCategory, type: AnnotationType) => void;
-  isEditMode: boolean;
+  annotations: Annotation[];
 }
 
 interface CategorySectionProps {
@@ -126,12 +127,16 @@ function CategorySection({
   );
 }
 
-export function AnnotationPanel({
-  selectedCategory,
-  selectedType,
-  onSelect,
-  isEditMode,
-}: AnnotationPanelProps) {
+export function AnnotationPanel({ annotations }: AnnotationPanelProps) {
+  const dispatch = useAppDispatch();
+  const selectedCategory = useAppSelector(selectSelectedCategory);
+  const selectedType = useAppSelector(selectSelectedType);
+  const isEditMode = useAppSelector(selectIsEditMode);
+
+  const handleSelect = (category: AnnotationCategory, type: AnnotationType) => {
+    dispatch(selectAnnotationType({ category, type }));
+  };
+
   const signageColors: Record<SignageType, string> = {
     ticket: 'bg-signage-ticket',
     vip: 'bg-signage-vip',
@@ -166,7 +171,7 @@ export function AnnotationPanel({
           types={SIGNAGE_TYPES}
           selectedCategory={selectedCategory}
           selectedType={selectedType}
-          onSelect={onSelect}
+          onSelect={handleSelect}
           colorClass="text-signage"
           typeColorMap={signageColors}
           isEditMode={isEditMode}
@@ -177,7 +182,7 @@ export function AnnotationPanel({
           types={BARRIER_TYPES}
           selectedCategory={selectedCategory}
           selectedType={selectedType}
-          onSelect={onSelect}
+          onSelect={handleSelect}
           colorClass="text-barrier"
           typeColorMap={barrierColors}
           isEditMode={isEditMode}
@@ -188,7 +193,7 @@ export function AnnotationPanel({
           types={FLOW_TYPES}
           selectedCategory={selectedCategory}
           selectedType={selectedType}
-          onSelect={onSelect}
+          onSelect={handleSelect}
           colorClass="text-flow"
           typeColorMap={flowColors}
           isEditMode={isEditMode}

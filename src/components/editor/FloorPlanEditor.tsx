@@ -5,7 +5,6 @@ import { Canvas } from './Canvas';
 import { EventsPanel } from './EventsPanel';
 import { useSupabaseEvents } from '@/hooks/useSupabaseEvents';
 import { useVenueLayouts } from '@/hooks/useVenueLayouts';
-import { useAnnotationSettings } from '@/hooks/useAnnotationSettings';
 import { useOrganization } from '@/hooks/useOrganization';
 import { useAuthContext } from '@/components/auth/AuthProvider';
 import { toast } from 'sonner';
@@ -13,10 +12,19 @@ import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { LogOut, Building2, Eye, Edit3, Download, Upload, RotateCcw } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useAppSelector, useAppDispatch } from '@/store/hooks';
+import { selectMode, selectSelectedCategory, selectSelectedType } from '@/store/selectors';
+import { setMode } from '@/store/slices/uiSlice';
 
 export function FloorPlanEditor() {
+  const dispatch = useAppDispatch();
   const { signOut } = useAuthContext();
   const { organization, currentUser } = useOrganization();
+
+  // Redux state
+  const mode = useAppSelector(selectMode);
+  const selectedCategory = useAppSelector(selectSelectedCategory);
+  const selectedType = useAppSelector(selectSelectedType);
 
   const {
     events,
@@ -33,38 +41,16 @@ export function FloorPlanEditor() {
     layouts,
     activeLayout,
     activeLayoutId,
-    setActiveLayoutId,
     loading: layoutsLoading,
     createLayout,
-    deleteLayout,
     uploadImage,
     addAnnotation,
     deleteAnnotation,
     updateAnnotation,
     clearAnnotations,
-    renameLayout,
     getAnnotations,
     getImageUrl,
   } = useVenueLayouts(activeEventId);
-
-  const {
-    mode,
-    setMode,
-    selectedCategory,
-    selectedType,
-    selectAnnotationType,
-    focusedCategory,
-    setFocusedCategory,
-    selectedAnnotationId,
-    setSelectedAnnotationId,
-    layerVisibility,
-    subLayerVisibility,
-    toggleLayerVisibility,
-    toggleSubLayerVisibility,
-    isAnnotationVisible,
-    pendingLine,
-    setPendingLine,
-  } = useAnnotationSettings();
 
   // Auto-create a layout when selecting an event with no layouts
   useEffect(() => {
@@ -232,6 +218,13 @@ export function FloorPlanEditor() {
     }
   };
 
+  const handleSetMode = useCallback(
+    (newMode: 'edit' | 'view') => {
+      dispatch(setMode(newMode));
+    },
+    [dispatch]
+  );
+
   const isLoading = eventsLoading || layoutsLoading;
 
   return (
@@ -258,7 +251,7 @@ export function FloorPlanEditor() {
           <Tooltip>
             <TooltipTrigger asChild>
               <button
-                onClick={() => setMode('edit')}
+                onClick={() => handleSetMode('edit')}
                 className={cn(
                   'flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all',
                   mode === 'edit'
@@ -275,7 +268,7 @@ export function FloorPlanEditor() {
           <Tooltip>
             <TooltipTrigger asChild>
               <button
-                onClick={() => setMode('view')}
+                onClick={() => handleSetMode('view')}
                 className={cn(
                   'flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all',
                   mode === 'view'
@@ -368,10 +361,7 @@ export function FloorPlanEditor() {
         />
 
         <AnnotationPanel
-          selectedCategory={selectedCategory}
-          selectedType={selectedType}
-          onSelect={selectAnnotationType}
-          isEditMode={mode === 'edit'}
+          annotations={annotations}
         />
 
         {isLoading ? (
@@ -386,18 +376,9 @@ export function FloorPlanEditor() {
             image={imageUrl}
             onImageUpload={handleImageUpload}
             annotations={annotations}
-            isAnnotationVisible={isAnnotationVisible}
-            focusedCategory={focusedCategory}
-            isEditMode={mode === 'edit'}
             onAddAnnotation={handleAddAnnotation}
             onDeleteAnnotation={handleDeleteAnnotation}
             onUpdateAnnotation={handleUpdateAnnotation}
-            selectedCategory={selectedCategory}
-            selectedType={selectedType}
-            pendingLine={pendingLine}
-            setPendingLine={setPendingLine}
-            selectedAnnotationId={selectedAnnotationId}
-            setSelectedAnnotationId={setSelectedAnnotationId}
           />
         ) : (
           <div className="flex-1 flex items-center justify-center canvas-grid">
@@ -425,12 +406,6 @@ export function FloorPlanEditor() {
         )}
 
         <LayersPanel
-          layerVisibility={layerVisibility}
-          subLayerVisibility={subLayerVisibility}
-          onToggleLayer={toggleLayerVisibility}
-          onToggleSubLayer={toggleSubLayerVisibility}
-          focusedCategory={focusedCategory}
-          onFocusCategory={setFocusedCategory}
           annotations={annotations}
         />
       </div>

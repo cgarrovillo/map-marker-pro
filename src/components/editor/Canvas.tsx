@@ -5,33 +5,52 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { Slider } from '@/components/ui/slider';
 import {
   Annotation,
-  AnnotationCategory,
-  AnnotationType,
   Point,
   SIGNAGE_TYPES,
   BARRIER_TYPES,
   FLOW_TYPES,
   isLineAnnotation,
+  AnnotationCategory,
+  AnnotationType,
 } from '@/types/annotations';
 import { cn } from '@/lib/utils';
-import { useCanvasTransform } from '@/hooks/useCanvasTransform';
+import { useAppSelector, useAppDispatch } from '@/store/hooks';
+import {
+  selectTransform,
+  selectIsPanning,
+  selectMinZoom,
+  selectMaxZoom,
+  selectZoomPercentage,
+  selectIsEditMode,
+  selectSelectedCategory,
+  selectSelectedType,
+  selectSelectedAnnotationId,
+  selectFocusedCategory,
+  selectPendingLine,
+  selectIsAnnotationVisible,
+} from '@/store/selectors';
+import {
+  setTransform,
+  zoomIn,
+  zoomOut,
+  setZoom,
+  resetTransform,
+  pan,
+  startPan,
+  endPan,
+} from '@/store/slices/canvasSlice';
+import {
+  setSelectedAnnotationId,
+  setPendingLine,
+} from '@/store/slices/uiSlice';
 
 interface CanvasProps {
   image: string | null;
   onImageUpload: (file: File) => void;
   annotations: Annotation[];
-  isAnnotationVisible: (annotation: Annotation) => boolean;
-  focusedCategory: AnnotationCategory | null;
-  isEditMode: boolean;
   onAddAnnotation: (points: Point[], label?: string) => void;
   onDeleteAnnotation: (id: string) => void;
   onUpdateAnnotation?: (id: string, updates: Partial<Annotation>) => void;
-  selectedCategory: AnnotationCategory;
-  selectedType: AnnotationType;
-  pendingLine: Point[] | null;
-  setPendingLine: (points: Point[] | null) => void;
-  selectedAnnotationId: string | null;
-  setSelectedAnnotationId: (id: string | null) => void;
 }
 
 const getTypeColor = (category: AnnotationCategory, type: AnnotationType): string => {
@@ -61,77 +80,89 @@ export function Canvas({
   image,
   onImageUpload,
   annotations,
-  isAnnotationVisible,
-  focusedCategory,
-  isEditMode,
   onAddAnnotation,
   onDeleteAnnotation,
   onUpdateAnnotation,
-  selectedCategory,
-  selectedType,
-  pendingLine,
-  setPendingLine,
-  selectedAnnotationId,
-  setSelectedAnnotationId,
 }: CanvasProps) {
+  const dispatch = useAppDispatch();
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
+  const lastPanPosition = useRef<{ x: number; y: number } | null>(null);
+  
+  // Redux state
+  const transform = useAppSelector(selectTransform);
+  const isPanning = useAppSelector(selectIsPanning);
+  const minZoom = useAppSelector(selectMinZoom);
+  const maxZoom = useAppSelector(selectMaxZoom);
+  const zoomPercentage = useAppSelector(selectZoomPercentage);
+  const isEditMode = useAppSelector(selectIsEditMode);
+  const selectedCategory = useAppSelector(selectSelectedCategory);
+  const selectedType = useAppSelector(selectSelectedType);
+  const selectedAnnotationId = useAppSelector(selectSelectedAnnotationId);
+  const focusedCategory = useAppSelector(selectFocusedCategory);
+  const pendingLine = useAppSelector(selectPendingLine);
+  const isAnnotationVisible = useAppSelector(selectIsAnnotationVisible);
+  
+  // Local state (kept local for performance - frequent updates during drag)
   const [isDragging, setIsDragging] = useState(false);
   const [mousePos, setMousePos] = useState<Point | null>(null);
-  
-  // Drag state for annotations (triggered after selecting)
-  // We track the current dragged points locally for smooth visual feedback
   const [draggingAnnotation, setDraggingAnnotation] = useState<{
     id: string;
     startPoint: Point;
     originalPoints: Point[];
-    currentPoints: Point[]; // Live position during drag
+    currentPoints: Point[];
   } | null>(null);
   
   // Whether the current annotation type uses lines or markers
   const usesLineDrawing = isLineAnnotation(selectedCategory, selectedType);
 
-  // Canvas transform (zoom/pan)
-  const {
-    transform,
-    zoomIn,
-    zoomOut,
-    setZoom,
-    resetTransform,
-    handleWheelZoom,
-    handleWheelPan,
-    isPanning,
-    startPan,
-    updatePan,
-    endPan,
-    zoomPercentage,
-    minZoom,
-    maxZoom,
-  } = useCanvasTransform();
+  // Zoom sensitivity for wheel events
+  const zoomSensitivity = 0.008;
+  const panSensitivity = 1;
 
   // Handle wheel events for zoom and pan
-  // - Ctrl/Cmd + scroll OR pinch-to-zoom: zoom
-  // - Two-finger swipe (no modifier): pan
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
     const handleWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      
       // Pinch-to-zoom on trackpad sends ctrlKey: true
-      // Also handle explicit Ctrl/Cmd + scroll for mouse users
       if (e.ctrlKey || e.metaKey) {
+        // Zoom
         const rect = container.getBoundingClientRect();
-        handleWheelZoom(e, rect);
+        const deltaMultiplier = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 100 : 1;
+        const normalizedDelta = e.deltaY * deltaMultiplier;
+        const zoomFactor = Math.pow(2, -normalizedDelta * zoomSensitivity);
+        const newScale = Math.max(minZoom, Math.min(transform.scale * zoomFactor, maxZoom));
+
+        if (Math.abs(newScale - transform.scale) < 0.001) return;
+
+        const cursorX = e.clientX - rect.left;
+        const cursorY = e.clientY - rect.top;
+        const pointX = (cursorX - transform.translateX) / transform.scale;
+        const pointY = (cursorY - transform.translateY) / transform.scale;
+        const newTranslateX = cursorX - pointX * newScale;
+        const newTranslateY = cursorY - pointY * newScale;
+
+        dispatch(setTransform({
+          scale: newScale,
+          translateX: newTranslateX,
+          translateY: newTranslateY,
+        }));
       } else {
-        // Two-finger swipe on trackpad OR regular scroll wheel
-        // Use this for panning the canvas
-        handleWheelPan(e);
+        // Pan
+        const deltaMultiplier = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 100 : 1;
+        const deltaX = e.deltaX * deltaMultiplier * panSensitivity;
+        const deltaY = e.deltaY * deltaMultiplier * panSensitivity;
+        dispatch(pan({ deltaX: -deltaX, deltaY: -deltaY }));
       }
     };
 
     container.addEventListener('wheel', handleWheel, { passive: false });
     return () => container.removeEventListener('wheel', handleWheel);
-  }, [handleWheelZoom, handleWheelPan]);
+  }, [dispatch, transform, minZoom, maxZoom]);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -165,20 +196,14 @@ export function Canvas({
   );
 
   // Convert screen coordinates to canvas percentage coordinates
-  // Must account for zoom/pan transform to get correct positions
   const screenToCanvasPercent = useCallback(
     (clientX: number, clientY: number): Point | null => {
       const container = containerRef.current;
       if (!container) return null;
 
       const rect = container.getBoundingClientRect();
-      
-      // Get position relative to container, then reverse the transform
-      // The canvas is translated by (translateX, translateY) and scaled by scale
       const canvasX = (clientX - rect.left - transform.translateX) / transform.scale;
       const canvasY = (clientY - rect.top - transform.translateY) / transform.scale;
-      
-      // Convert to percentage (canvas at scale 1 fills the container)
       const x = (canvasX / rect.width) * 100;
       const y = (canvasY / rect.height) * 100;
 
@@ -194,11 +219,12 @@ export function Canvas({
       // Pan with middle mouse button or Alt+click
       if ((e.button === 1) || (e.button === 0 && e.altKey)) {
         e.preventDefault();
-        startPan(e.clientX, e.clientY);
+        dispatch(startPan());
+        lastPanPosition.current = { x: e.clientX, y: e.clientY };
         return;
       }
     },
-    [image, startPan]
+    [image, dispatch]
   );
 
   const handleCanvasMouseMove = useCallback(
@@ -208,12 +234,15 @@ export function Canvas({
       if (pos) setMousePos(pos);
 
       // Handle panning
-      if (isPanning) {
-        updatePan(e.clientX, e.clientY);
+      if (isPanning && lastPanPosition.current) {
+        const deltaX = e.clientX - lastPanPosition.current.x;
+        const deltaY = e.clientY - lastPanPosition.current.y;
+        dispatch(pan({ deltaX, deltaY }));
+        lastPanPosition.current = { x: e.clientX, y: e.clientY };
         return;
       }
 
-      // Handle annotation dragging - update local state for smooth visual feedback
+      // Handle annotation dragging
       if (draggingAnnotation) {
         const currentPos = screenToCanvasPercent(e.clientX, e.clientY);
         if (!currentPos) return;
@@ -226,26 +255,25 @@ export function Canvas({
           y: Math.max(0, Math.min(100, p.y + deltaY)),
         }));
 
-        // Update local drag state for immediate visual feedback
         setDraggingAnnotation({
           ...draggingAnnotation,
           currentPoints: newPoints,
         });
       }
     },
-    [screenToCanvasPercent, isPanning, updatePan, draggingAnnotation]
+    [screenToCanvasPercent, isPanning, dispatch, draggingAnnotation]
   );
 
   const handleCanvasMouseUp = useCallback(() => {
     if (isPanning) {
-      endPan();
+      dispatch(endPan());
+      lastPanPosition.current = null;
     }
-    // Save the final position to database when drag ends
     if (draggingAnnotation && onUpdateAnnotation) {
       onUpdateAnnotation(draggingAnnotation.id, { points: draggingAnnotation.currentPoints });
       setDraggingAnnotation(null);
     }
-  }, [isPanning, endPan, draggingAnnotation, onUpdateAnnotation]);
+  }, [isPanning, dispatch, draggingAnnotation, onUpdateAnnotation]);
 
   const handleCanvasClick = useCallback(
     (e: React.MouseEvent) => {
@@ -256,19 +284,16 @@ export function Canvas({
       if (!pos) return;
 
       // Clear selection when clicking on empty canvas
-      setSelectedAnnotationId(null);
+      dispatch(setSelectedAnnotationId(null));
 
-      // Auto-detect marker vs line based on selected annotation type
       if (usesLineDrawing) {
-        // Line drawing mode (flows, drapes)
         if (!pendingLine) {
-          setPendingLine([pos]);
+          dispatch(setPendingLine([pos]));
         } else {
           onAddAnnotation([...pendingLine, pos]);
-          setPendingLine(null);
+          dispatch(setPendingLine(null));
         }
       } else {
-        // Marker mode (signage, stanchions)
         onAddAnnotation([pos]);
       }
     },
@@ -280,9 +305,8 @@ export function Canvas({
       screenToCanvasPercent,
       onAddAnnotation,
       pendingLine,
-      setPendingLine,
       usesLineDrawing,
-      setSelectedAnnotationId,
+      dispatch,
     ]
   );
 
@@ -294,35 +318,30 @@ export function Canvas({
       const pos = screenToCanvasPercent(e.clientX, e.clientY);
       if (!pos) return;
 
-      // If this annotation is already selected, start dragging
       if (selectedAnnotationId === annotation.id) {
         setDraggingAnnotation({
           id: annotation.id,
           startPoint: pos,
           originalPoints: [...annotation.points],
-          currentPoints: [...annotation.points], // Start with current position
+          currentPoints: [...annotation.points],
         });
       } else {
-        // Select this annotation
-        setSelectedAnnotationId(annotation.id);
-        // Cancel any pending line drawing
-        if (pendingLine) setPendingLine(null);
+        dispatch(setSelectedAnnotationId(annotation.id));
+        if (pendingLine) dispatch(setPendingLine(null));
       }
     },
-    [isEditMode, screenToCanvasPercent, selectedAnnotationId, setSelectedAnnotationId, pendingLine, setPendingLine]
+    [isEditMode, screenToCanvasPercent, selectedAnnotationId, dispatch, pendingLine]
   );
 
   const handleAnnotationClick = useCallback(
     (e: React.MouseEvent, _annotation: Annotation) => {
       e.stopPropagation();
-      // Selection is handled in mouseDown, nothing extra needed here
     },
     []
   );
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't handle if user is typing in an input or editable element
       const target = e.target as HTMLElement;
       if (
         target instanceof HTMLInputElement ||
@@ -332,32 +351,32 @@ export function Canvas({
         return;
       }
 
-      // Escape cancels pending line or deselects annotation
       if (e.key === 'Escape') {
         if (pendingLine) {
-          setPendingLine(null);
+          dispatch(setPendingLine(null));
         } else if (selectedAnnotationId) {
-          setSelectedAnnotationId(null);
+          dispatch(setSelectedAnnotationId(null));
         }
       }
       
-      // Delete/Backspace deletes selected annotation
       if ((e.key === 'Delete' || e.key === 'Backspace') && selectedAnnotationId && isEditMode) {
         e.preventDefault();
         const idToDelete = selectedAnnotationId;
-        setSelectedAnnotationId(null);
+        dispatch(setSelectedAnnotationId(null));
         onDeleteAnnotation(idToDelete);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [pendingLine, setPendingLine, selectedAnnotationId, setSelectedAnnotationId, isEditMode, onDeleteAnnotation]);
+  }, [pendingLine, selectedAnnotationId, isEditMode, onDeleteAnnotation, dispatch]);
 
   // Handle mouse up outside of component
   useEffect(() => {
     const handleGlobalMouseUp = () => {
-      if (isPanning) endPan();
-      // Save final position when releasing outside the canvas
+      if (isPanning) {
+        dispatch(endPan());
+        lastPanPosition.current = null;
+      }
       if (draggingAnnotation && onUpdateAnnotation) {
         onUpdateAnnotation(draggingAnnotation.id, { points: draggingAnnotation.currentPoints });
         setDraggingAnnotation(null);
@@ -366,15 +385,19 @@ export function Canvas({
 
     window.addEventListener('mouseup', handleGlobalMouseUp);
     return () => window.removeEventListener('mouseup', handleGlobalMouseUp);
-  }, [isPanning, endPan, draggingAnnotation, onUpdateAnnotation]);
+  }, [isPanning, dispatch, draggingAnnotation, onUpdateAnnotation]);
 
   const getCursor = () => {
     if (isPanning) return 'grabbing';
     if (draggingAnnotation) return 'grabbing';
     if (!isEditMode) return 'default';
-    // Show crosshair for placing annotations in edit mode
     return 'crosshair';
   };
+
+  const handleZoomIn = useCallback(() => dispatch(zoomIn()), [dispatch]);
+  const handleZoomOut = useCallback(() => dispatch(zoomOut()), [dispatch]);
+  const handleSetZoom = useCallback((value: number) => dispatch(setZoom(value)), [dispatch]);
+  const handleResetTransform = useCallback(() => dispatch(resetTransform()), [dispatch]);
 
   const uploadOverlay = (
     <label className="cursor-pointer">
@@ -444,7 +467,7 @@ export function Canvas({
               variant="ghost"
               size="icon"
               className="h-7 w-7"
-              onClick={zoomOut}
+              onClick={handleZoomOut}
               disabled={zoomPercentage <= minZoom * 100}
             >
               <ZoomOut className="w-4 h-4" />
@@ -459,7 +482,7 @@ export function Canvas({
             min={minZoom}
             max={maxZoom}
             step={0.05}
-            onValueChange={([value]) => setZoom(value)}
+            onValueChange={([value]) => handleSetZoom(value)}
             className="w-24"
           />
           <span className="text-xs font-mono text-muted-foreground w-10 text-right">
@@ -473,7 +496,7 @@ export function Canvas({
               variant="ghost"
               size="icon"
               className="h-7 w-7"
-              onClick={zoomIn}
+              onClick={handleZoomIn}
               disabled={zoomPercentage >= maxZoom * 100}
             >
               <ZoomIn className="w-4 h-4" />
@@ -490,7 +513,7 @@ export function Canvas({
               variant="ghost"
               size="icon"
               className="h-7 w-7"
-              onClick={resetTransform}
+              onClick={handleResetTransform}
             >
               <Maximize className="w-4 h-4" />
             </Button>
@@ -558,7 +581,6 @@ export function Canvas({
               const color = getTypeColor(annotation.category, annotation.type);
               const isBeingDragged = draggingAnnotation?.id === annotation.id;
               const isSelected = selectedAnnotationId === annotation.id;
-              // Use live dragged position for smooth feedback
               const points = isBeingDragged ? draggingAnnotation.currentPoints : annotation.points;
 
               return (
@@ -646,7 +668,6 @@ export function Canvas({
             const color = getTypeColor(annotation.category, annotation.type);
             const isBeingDragged = draggingAnnotation?.id === annotation.id;
             const isSelected = selectedAnnotationId === annotation.id;
-            // Use live dragged position for smooth feedback
             const point = isBeingDragged ? draggingAnnotation.currentPoints[0] : annotation.points[0];
             const label = getTypeLabel(annotation.category, annotation.type);
 
