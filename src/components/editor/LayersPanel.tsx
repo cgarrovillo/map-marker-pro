@@ -20,9 +20,12 @@ import {
   toggleSubLayerVisibility,
   setFocusedCategory,
 } from '@/store/slices/uiSlice';
+import { SignDetailsPanel } from './SignDetailsPanel';
 
 interface LayersPanelProps {
   annotations: Annotation[];
+  selectedAnnotation: Annotation | null;
+  onUpdateAnnotation?: (id: string, updates: Partial<Annotation>) => void;
 }
 
 interface LayerRowProps {
@@ -134,11 +137,24 @@ function SubLayerRow({
   );
 }
 
-export function LayersPanel({ annotations }: LayersPanelProps) {
+export function LayersPanel({ 
+  annotations, 
+  selectedAnnotation, 
+  onUpdateAnnotation 
+}: LayersPanelProps) {
   const dispatch = useAppDispatch();
   const layerVisibility = useAppSelector(selectLayerVisibility);
   const subLayerVisibility = useAppSelector(selectSubLayerVisibility);
   const focusedCategory = useAppSelector(selectFocusedCategory);
+  
+  // Check if selected annotation is a signage type
+  const isSignageSelected = selectedAnnotation?.category === 'signage';
+  
+  const handleSignUpdate = (updates: Partial<Annotation>) => {
+    if (selectedAnnotation && onUpdateAnnotation) {
+      onUpdateAnnotation(selectedAnnotation.id, updates);
+    }
+  };
 
   const countByType = (category: AnnotationCategory, type?: AnnotationType) => {
     return annotations.filter(
@@ -240,6 +256,14 @@ export function LayersPanel({ annotations }: LayersPanelProps) {
           ))}
         </LayerRow>
       </div>
+      
+      {/* Sign Details Panel - shows when a signage annotation is selected */}
+      {isSignageSelected && selectedAnnotation && (
+        <SignDetailsPanel
+          annotation={selectedAnnotation}
+          onUpdate={handleSignUpdate}
+        />
+      )}
     </div>
   );
 }

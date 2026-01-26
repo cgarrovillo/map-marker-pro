@@ -9,6 +9,9 @@ import {
   SIGNAGE_TYPES,
   BARRIER_TYPES,
   FLOW_TYPES,
+  SIGN_DIRECTIONS,
+  SIGN_HOLDERS,
+  SignSide,
   isLineAnnotation,
   AnnotationCategory,
   AnnotationType,
@@ -87,6 +90,7 @@ export function Canvas({
   const dispatch = useAppDispatch();
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
+  const imageRef = useRef<HTMLImageElement>(null);
   const lastPanPosition = useRef<{ x: number; y: number } | null>(null);
   
   // Redux state
@@ -112,9 +116,63 @@ export function Canvas({
     originalPoints: Point[];
     currentPoints: Point[];
   } | null>(null);
+  // Track the natural image dimensions for proper coordinate mapping
+  const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(null);
   
   // Whether the current annotation type uses lines or markers
   const usesLineDrawing = isLineAnnotation(selectedCategory, selectedType);
+
+  // Calculate the actual rendered image bounds within the container (accounting for object-contain)
+  const getImageBounds = useCallback(() => {
+    const container = containerRef.current;
+    if (!container || !imageDimensions) return null;
+
+    const containerWidth = container.clientWidth;
+    const containerHeight = container.clientHeight;
+    const imageAspectRatio = imageDimensions.width / imageDimensions.height;
+    const containerAspectRatio = containerWidth / containerHeight;
+
+    let renderedWidth: number;
+    let renderedHeight: number;
+    let offsetX: number;
+    let offsetY: number;
+
+    if (imageAspectRatio > containerAspectRatio) {
+      // Image is wider than container - width is the constraint
+      renderedWidth = containerWidth;
+      renderedHeight = containerWidth / imageAspectRatio;
+      offsetX = 0;
+      offsetY = (containerHeight - renderedHeight) / 2;
+    } else {
+      // Image is taller than container - height is the constraint
+      renderedHeight = containerHeight;
+      renderedWidth = containerHeight * imageAspectRatio;
+      offsetX = (containerWidth - renderedWidth) / 2;
+      offsetY = 0;
+    }
+
+    return { renderedWidth, renderedHeight, offsetX, offsetY };
+  }, [imageDimensions]);
+
+  // Handle image load to get natural dimensions
+  const handleImageLoad = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
+    const img = e.currentTarget;
+    setImageDimensions({ width: img.naturalWidth, height: img.naturalHeight });
+  }, []);
+
+  // Force re-render on container resize to recalculate image bounds
+  const [, forceUpdate] = useState({});
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const resizeObserver = new ResizeObserver(() => {
+      forceUpdate({});
+    });
+
+    resizeObserver.observe(container);
+    return () => resizeObserver.disconnect();
+  }, []);
 
   // Zoom sensitivity for wheel events
   const zoomSensitivity = 0.008;
@@ -195,21 +253,25 @@ export function Canvas({
     [onImageUpload]
   );
 
-  // Convert screen coordinates to canvas percentage coordinates
+  // Convert screen coordinates to image percentage coordinates
   const screenToCanvasPercent = useCallback(
     (clientX: number, clientY: number): Point | null => {
       const container = containerRef.current;
-      if (!container) return null;
+      const bounds = getImageBounds();
+      if (!container || !bounds) return null;
 
       const rect = container.getBoundingClientRect();
+      // Get position in the untransformed canvas space
       const canvasX = (clientX - rect.left - transform.translateX) / transform.scale;
       const canvasY = (clientY - rect.top - transform.translateY) / transform.scale;
-      const x = (canvasX / rect.width) * 100;
-      const y = (canvasY / rect.height) * 100;
+      
+      // Convert to percentage relative to the actual image bounds, not the container
+      const x = ((canvasX - bounds.offsetX) / bounds.renderedWidth) * 100;
+      const y = ((canvasY - bounds.offsetY) / bounds.renderedHeight) * 100;
 
       return { x: Math.max(0, Math.min(100, x)), y: Math.max(0, Math.min(100, y)) };
     },
-    [transform]
+    [transform, getImageBounds]
   );
 
   const handleCanvasMouseDown = useCallback(
@@ -307,6 +369,8 @@ export function Canvas({
       pendingLine,
       usesLineDrawing,
       dispatch,
+      selectedCategory,
+      selectedType,
     ]
   );
 
@@ -565,13 +629,35 @@ export function Canvas({
         }}
       >
         <img
+          ref={imageRef}
           src={image}
           alt="Floor plan"
           className="absolute inset-0 w-full h-full object-contain pointer-events-none select-none"
           draggable={false}
+          onLoad={handleImageLoad}
         />
 
-        <svg className="absolute inset-0 w-full h-full pointer-events-none">
+        {/* Annotation layer - positioned to match the actual rendered image bounds */}
+        {imageDimensions && (() => {
+          const bounds = getImageBounds();
+          if (!bounds) return null;
+          
+          return (
+            <div
+              className="absolute"
+              style={{
+                left: bounds.offsetX,
+                top: bounds.offsetY,
+                width: bounds.renderedWidth,
+                height: bounds.renderedHeight,
+              }}
+            >
+              <svg 
+                viewBox="0 0 100 100" 
+                preserveAspectRatio="none"
+                className="absolute inset-0 w-full h-full"
+                style={{ pointerEvents: 'none' }}
+              >
           {/* Render flow lines */}
           {annotations
             .filter((a) => a.points.length > 1 && isAnnotationVisible(a))
@@ -595,31 +681,32 @@ export function Canvas({
                   {/* Selection outline */}
                   {isSelected && (
                     <polyline
-                      points={points.map((p) => `${p.x}%,${p.y}%`).join(' ')}
+                      points={points.map((p) => `${p.x},${p.y}`).join(' ')}
                       fill="none"
                       stroke="white"
-                      strokeWidth={6 / transform.scale}
+                      strokeWidth={0.8 / transform.scale}
                       strokeLinecap="round"
                       style={{ pointerEvents: 'none' }}
                     />
                   )}
                   {/* Invisible wider stroke for easier selection */}
                   <polyline
-                    points={points.map((p) => `${p.x}%,${p.y}%`).join(' ')}
+                    points={points.map((p) => `${p.x},${p.y}`).join(' ')}
                     fill="none"
                     stroke="transparent"
-                    strokeWidth={12 / transform.scale}
+                    strokeWidth={1.5 / transform.scale}
                     style={{ 
-                      pointerEvents: 'stroke', 
+                      pointerEvents: 'auto', 
                       cursor: isEditMode ? (isSelected ? 'move' : 'pointer') : undefined 
                     }}
                     onMouseDown={(e) => handleAnnotationMouseDown(e as unknown as React.MouseEvent, annotation)}
+                    onClick={(e) => e.stopPropagation()}
                   />
                   <polyline
-                    points={points.map((p) => `${p.x}%,${p.y}%`).join(' ')}
+                    points={points.map((p) => `${p.x},${p.y}`).join(' ')}
                     fill="none"
                     stroke={color}
-                    strokeWidth={3 / transform.scale}
+                    strokeWidth={0.4 / transform.scale}
                     className={annotation.category === 'flow' ? 'flow-line' : ''}
                     style={{ pointerEvents: 'none' }}
                   />
@@ -630,123 +717,241 @@ export function Canvas({
                         const last = points[points.length - 1];
                         const prev = points[points.length - 2];
                         const angle = Math.atan2(last.y - prev.y, last.x - prev.x);
-                        const size = 1.5 / transform.scale;
+                        const size = 0.8 / transform.scale;
                         const x1 = last.x - size * Math.cos(angle - Math.PI / 6);
                         const y1 = last.y - size * Math.sin(angle - Math.PI / 6);
                         const x2 = last.x - size * Math.cos(angle + Math.PI / 6);
                         const y2 = last.y - size * Math.sin(angle + Math.PI / 6);
-                        return `${last.x}%,${last.y}% ${x1}%,${y1}% ${x2}%,${y2}%`;
+                        return `${last.x},${last.y} ${x1},${y1} ${x2},${y2}`;
                       })()}
                       fill={color}
+                      style={{ pointerEvents: 'none' }}
                     />
                   )}
                 </g>
               );
             })}
 
-          {/* Pending line preview */}
-          {pendingLine && mousePos && (
-            <line
-              x1={`${pendingLine[pendingLine.length - 1].x}%`}
-              y1={`${pendingLine[pendingLine.length - 1].y}%`}
-              x2={`${mousePos.x}%`}
-              y2={`${mousePos.y}%`}
-              stroke={getTypeColor(selectedCategory, selectedType)}
-              strokeWidth={2 / transform.scale}
-              strokeDasharray={`${5 / transform.scale},${5 / transform.scale}`}
-              opacity="0.6"
-            />
-          )}
-        </svg>
-
-        {/* Render markers */}
-        {annotations
-          .filter((a) => a.points.length === 1 && isAnnotationVisible(a))
-          .map((annotation) => {
-            const opacity =
-              focusedCategory && focusedCategory !== annotation.category ? 0.2 : 1;
-            const color = getTypeColor(annotation.category, annotation.type);
-            const isBeingDragged = draggingAnnotation?.id === annotation.id;
-            const isSelected = selectedAnnotationId === annotation.id;
-            const point = isBeingDragged ? draggingAnnotation.currentPoints[0] : annotation.points[0];
-            const label = getTypeLabel(annotation.category, annotation.type);
-
-            return (
-              <div
-                key={annotation.id}
-                className={cn(
-                  'annotation-marker absolute -translate-x-1/2 -translate-y-full pointer-events-auto',
-                  isBeingDragged && 'scale-110 drop-shadow-xl',
-                  isEditMode && (isSelected ? 'cursor-move' : 'cursor-pointer')
+                {/* Pending line preview */}
+                {pendingLine && mousePos && (
+                  <line
+                    x1={pendingLine[pendingLine.length - 1].x}
+                    y1={pendingLine[pendingLine.length - 1].y}
+                    x2={mousePos.x}
+                    y2={mousePos.y}
+                    stroke={getTypeColor(selectedCategory, selectedType)}
+                    strokeWidth={0.3 / transform.scale}
+                    strokeDasharray={`${0.5 / transform.scale},${0.5 / transform.scale}`}
+                    opacity="0.6"
+                    style={{ pointerEvents: 'none' }}
+                  />
                 )}
-                style={{
-                  left: `${point.x}%`,
-                  top: `${point.y}%`,
-                  opacity,
-                  transformOrigin: 'center bottom',
-                }}
-                onMouseDown={(e) => handleAnnotationMouseDown(e, annotation)}
-                onClick={(e) => handleAnnotationClick(e, annotation)}
-              >
-                <div className="relative" style={{ transform: `scale(${1 / transform.scale})`, transformOrigin: 'center bottom' }}>
-                  {/* Selection ring */}
-                  {isSelected && (
-                    <div 
-                      className="absolute -inset-2 rounded-full border-2 border-white"
-                      style={{ 
-                        boxShadow: '0 0 8px rgba(255,255,255,0.5)',
-                        top: '-4px',
-                        left: '-4px',
-                        right: '-4px',
-                        bottom: '4px',
+              </svg>
+
+              {/* Render markers */}
+              {annotations
+                .filter((a) => a.points.length === 1 && isAnnotationVisible(a))
+                .map((annotation) => {
+                  const opacity =
+                    focusedCategory && focusedCategory !== annotation.category ? 0.2 : 1;
+                  const color = getTypeColor(annotation.category, annotation.type);
+                  const isBeingDragged = draggingAnnotation?.id === annotation.id;
+                  const isSelected = selectedAnnotationId === annotation.id;
+                  const point = isBeingDragged ? draggingAnnotation.currentPoints[0] : annotation.points[0];
+                  const label = getTypeLabel(annotation.category, annotation.type);
+                  const isSignage = annotation.category === 'signage';
+
+                  // Signage annotations render as small dots with optional direction arrows
+                  if (isSignage) {
+                    // Get holder config to determine if 2-sided
+                    const currentHolder = annotation.signHolder || 'sign-pedestal-2';
+                    const holderConfig = SIGN_HOLDERS[currentHolder];
+                    const isTwoSided = holderConfig?.sides === 2;
+
+                    // Get side data with backwards compatibility
+                    const getSideData = (side: 1 | 2): SignSide | undefined => {
+                      if (side === 1) {
+                        if (annotation.side1) return annotation.side1;
+                        if (annotation.imageUrl || annotation.direction) {
+                          return { imageUrl: annotation.imageUrl, direction: annotation.direction };
+                        }
+                        return undefined;
+                      }
+                      return annotation.side2;
+                    };
+
+                    const side1Data = getSideData(1);
+                    const side2Data = getSideData(2);
+
+                    // Helper to render a label with direction arrow
+                    const renderLabel = (sideData: SignSide | undefined, sideLabel: string) => {
+                      const direction = sideData?.direction;
+                      const directionRotation = direction ? SIGN_DIRECTIONS[direction].rotation : 0;
+                      
+                      return (
+                        <div
+                          className="whitespace-nowrap flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium"
+                          style={{ backgroundColor: color, color: 'white' }}
+                        >
+                          {sideLabel}
+                          {direction && (
+                            <svg
+                              width="12"
+                              height="12"
+                              viewBox="0 0 12 12"
+                              fill="none"
+                              xmlns="http://www.w3.org/2000/svg"
+                              style={{ transform: `rotate(${directionRotation}deg)` }}
+                            >
+                              <path
+                                d="M6 2L6 10M6 2L3 5M6 2L9 5"
+                                stroke="white"
+                                strokeWidth="1.5"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              />
+                            </svg>
+                          )}
+                        </div>
+                      );
+                    };
+
+                    return (
+                      <div
+                        key={annotation.id}
+                        className={cn(
+                          'annotation-marker absolute -translate-x-1/2 -translate-y-1/2 pointer-events-auto',
+                          isBeingDragged && 'scale-110 drop-shadow-xl',
+                          isEditMode && (isSelected ? 'cursor-move' : 'cursor-pointer')
+                        )}
+                        style={{
+                          left: `${point.x}%`,
+                          top: `${point.y}%`,
+                          opacity,
+                        }}
+                        onMouseDown={(e) => handleAnnotationMouseDown(e, annotation)}
+                        onClick={(e) => handleAnnotationClick(e, annotation)}
+                      >
+                        <div className="relative" style={{ transform: `scale(${1 / transform.scale})` }}>
+                          {/* Selection ring */}
+                          {isSelected && (
+                            <div 
+                              className="absolute rounded-full border-2 border-white"
+                              style={{ 
+                                boxShadow: '0 0 8px rgba(255,255,255,0.5)',
+                                top: '-6px',
+                                left: '-6px',
+                                right: '-6px',
+                                bottom: '-6px',
+                              }}
+                            />
+                          )}
+                          {/* Small dot */}
+                          <div
+                            className="w-4 h-4 rounded-full border-2 border-white"
+                            style={{ backgroundColor: color, boxShadow: '0 1px 3px rgba(0,0,0,0.3)' }}
+                          />
+                          {/* Labels - stacked for 2-sided signs */}
+                          <div className="absolute left-1/2 -translate-x-1/2 top-6 flex flex-col items-center gap-1">
+                            {renderLabel(side1Data, label)}
+                            {isTwoSided && renderLabel(side2Data, label)}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  // Non-signage markers (barriers) render as pin markers
+                  return (
+                    <div
+                      key={annotation.id}
+                      className={cn(
+                        'annotation-marker absolute -translate-x-1/2 -translate-y-full pointer-events-auto',
+                        isBeingDragged && 'scale-110 drop-shadow-xl',
+                        isEditMode && (isSelected ? 'cursor-move' : 'cursor-pointer')
+                      )}
+                      style={{
+                        left: `${point.x}%`,
+                        top: `${point.y}%`,
+                        opacity,
+                        transformOrigin: 'center bottom',
                       }}
-                    />
-                  )}
-                  <svg
-                    width="28"
-                    height="36"
-                    viewBox="0 0 28 36"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path
-                      d="M14 0C6.268 0 0 6.268 0 14c0 10.5 14 22 14 22s14-11.5 14-22C28 6.268 21.732 0 14 0z"
-                      fill={color}
-                    />
-                    <circle cx="14" cy="14" r="6" fill="white" fillOpacity="0.9" />
-                  </svg>
-                  <div
-                    className="absolute left-1/2 -translate-x-1/2 top-10 whitespace-nowrap px-2 py-0.5 rounded text-xs font-medium"
-                    style={{ backgroundColor: color, color: 'white' }}
-                  >
-                    {label}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+                      onMouseDown={(e) => handleAnnotationMouseDown(e, annotation)}
+                      onClick={(e) => handleAnnotationClick(e, annotation)}
+                    >
+                      <div className="relative" style={{ transform: `scale(${1 / transform.scale})`, transformOrigin: 'center bottom' }}>
+                        {/* Selection ring */}
+                        {isSelected && (
+                          <div 
+                            className="absolute -inset-2 rounded-full border-2 border-white"
+                            style={{ 
+                              boxShadow: '0 0 8px rgba(255,255,255,0.5)',
+                              top: '-4px',
+                              left: '-4px',
+                              right: '-4px',
+                              bottom: '4px',
+                            }}
+                          />
+                        )}
+                        <svg
+                          width="28"
+                          height="36"
+                          viewBox="0 0 28 36"
+                          fill="none"
+                          xmlns="http://www.w3.org/2000/svg"
+                        >
+                          <path
+                            d="M14 0C6.268 0 0 6.268 0 14c0 10.5 14 22 14 22s14-11.5 14-22C28 6.268 21.732 0 14 0z"
+                            fill={color}
+                          />
+                          <circle cx="14" cy="14" r="6" fill="white" fillOpacity="0.9" />
+                        </svg>
+                        <div
+                          className="absolute left-1/2 -translate-x-1/2 top-10 whitespace-nowrap px-2 py-0.5 rounded text-xs font-medium"
+                          style={{ backgroundColor: color, color: 'white' }}
+                        >
+                          {label}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+          );
+        })()}
       </div>
 
       {/* Crosshair for line drawing mode */}
-      {isEditMode && usesLineDrawing && mousePos && !isPanning && (
-        <div
-          className="absolute w-6 h-6 pointer-events-none z-10"
-          style={{
-            left: `calc(${mousePos.x}% * ${transform.scale} + ${transform.translateX}px)`,
-            top: `calc(${mousePos.y}% * ${transform.scale} + ${transform.translateY}px)`,
-            transform: 'translate(-50%, -50%)',
-          }}
-        >
+      {isEditMode && usesLineDrawing && mousePos && !isPanning && (() => {
+        const bounds = getImageBounds();
+        if (!bounds) return null;
+        
+        // Convert image-relative percentage to screen position
+        const imageX = (mousePos.x / 100) * bounds.renderedWidth + bounds.offsetX;
+        const imageY = (mousePos.y / 100) * bounds.renderedHeight + bounds.offsetY;
+        const screenX = imageX * transform.scale + transform.translateX;
+        const screenY = imageY * transform.scale + transform.translateY;
+        
+        return (
           <div
-            className="w-full h-0.5 absolute top-1/2 left-0"
-            style={{ backgroundColor: getTypeColor(selectedCategory, selectedType) }}
-          />
-          <div
-            className="h-full w-0.5 absolute left-1/2 top-0"
-            style={{ backgroundColor: getTypeColor(selectedCategory, selectedType) }}
-          />
-        </div>
-      )}
+            className="absolute w-6 h-6 pointer-events-none z-10"
+            style={{
+              left: screenX,
+              top: screenY,
+              transform: 'translate(-50%, -50%)',
+            }}
+          >
+            <div
+              className="w-full h-0.5 absolute top-1/2 left-0"
+              style={{ backgroundColor: getTypeColor(selectedCategory, selectedType) }}
+            />
+            <div
+              className="h-full w-0.5 absolute left-1/2 top-0"
+              style={{ backgroundColor: getTypeColor(selectedCategory, selectedType) }}
+            />
+          </div>
+        );
+      })()}
 
       {/* Pending line instructions */}
       {isEditMode && pendingLine && (

@@ -13,8 +13,9 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { LogOut, Building2, Eye, Edit3, Download, Upload, RotateCcw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAppSelector, useAppDispatch } from '@/store/hooks';
-import { selectMode, selectSelectedCategory, selectSelectedType } from '@/store/selectors';
-import { setMode } from '@/store/slices/uiSlice';
+import { selectMode, selectSelectedCategory, selectSelectedType, selectSelectedAnnotationId } from '@/store/selectors';
+import { setMode, setSelectedAnnotationId } from '@/store/slices/uiSlice';
+import { Annotation } from '@/types/annotations';
 
 export function FloorPlanEditor() {
   const dispatch = useAppDispatch();
@@ -25,6 +26,7 @@ export function FloorPlanEditor() {
   const mode = useAppSelector(selectMode);
   const selectedCategory = useAppSelector(selectSelectedCategory);
   const selectedType = useAppSelector(selectSelectedType);
+  const selectedAnnotationId = useAppSelector(selectSelectedAnnotationId);
 
   const {
     events,
@@ -61,6 +63,11 @@ export function FloorPlanEditor() {
 
   const annotations = getAnnotations(activeLayout);
   const imageUrl = getImageUrl(activeLayout?.image_path ?? null);
+  
+  // Find the selected annotation
+  const selectedAnnotation = selectedAnnotationId 
+    ? annotations.find(a => a.id === selectedAnnotationId) ?? null 
+    : null;
 
   const handleImageUpload = useCallback(
     async (file: File) => {
@@ -83,13 +90,17 @@ export function FloorPlanEditor() {
     async (points: { x: number; y: number }[], label?: string) => {
       if (!activeLayoutId) return;
       try {
-        await addAnnotation(activeLayoutId, selectedCategory, selectedType, points, label);
+        const newAnnotation = await addAnnotation(activeLayoutId, selectedCategory, selectedType, points, label);
+        // Auto-select the new annotation
+        if (newAnnotation) {
+          dispatch(setSelectedAnnotationId(newAnnotation.id));
+        }
       } catch (error) {
         toast.error('Failed to add annotation');
         console.error(error);
       }
     },
-    [activeLayoutId, selectedCategory, selectedType, addAnnotation]
+    [activeLayoutId, selectedCategory, selectedType, addAnnotation, dispatch]
   );
 
   const handleDeleteAnnotation = useCallback(
@@ -106,7 +117,7 @@ export function FloorPlanEditor() {
   );
 
   const handleUpdateAnnotation = useCallback(
-    async (id: string, updates: Partial<{ points: { x: number; y: number }[] }>) => {
+    async (id: string, updates: Partial<Annotation>) => {
       if (!activeLayoutId) return;
       try {
         await updateAnnotation(activeLayoutId, id, updates);
@@ -407,6 +418,8 @@ export function FloorPlanEditor() {
 
         <LayersPanel
           annotations={annotations}
+          selectedAnnotation={selectedAnnotation}
+          onUpdateAnnotation={handleUpdateAnnotation}
         />
       </div>
     </div>

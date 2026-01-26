@@ -6,6 +6,25 @@ export type FlowType = 'ingress' | 'egress';
 
 export type AnnotationType = SignageType | BarrierType | FlowType;
 
+// Sign-specific types
+export type SignDirection = 
+  | 'up' 
+  | 'down' 
+  | 'left' 
+  | 'right'
+  | 'up-left' 
+  | 'up-right' 
+  | 'down-left' 
+  | 'down-right';
+
+export type SignHolderType = 'sign-pedestal-1' | 'sign-pedestal-2';
+
+// Interface for side-specific sign data
+export interface SignSide {
+  imageUrl?: string;
+  direction?: SignDirection;
+}
+
 export interface Point {
   x: number;
   y: number;
@@ -18,6 +37,13 @@ export interface Annotation {
   points: Point[];
   label?: string;
   createdAt: number;
+  // Sign-specific optional properties
+  signHolder?: SignHolderType;
+  side1?: SignSide;  // Side 1 details
+  side2?: SignSide;  // Side 2 details (only used if holder is 2-sided)
+  // Deprecated - kept for backwards compatibility, use side1/side2 instead
+  imageUrl?: string;
+  direction?: SignDirection;
 }
 
 export interface LayerVisibility {
@@ -65,6 +91,24 @@ export const BARRIER_TYPES: Record<BarrierType, { label: string; icon: string }>
 export const FLOW_TYPES: Record<FlowType, { label: string; icon: string }> = {
   ingress: { label: 'Ingress Flow', icon: 'ArrowRight' },
   egress: { label: 'Egress / Emergency', icon: 'LogOut' },
+};
+
+// Sign direction configuration with rotation degrees for arrow display
+export const SIGN_DIRECTIONS: Record<SignDirection, { label: string; rotation: number }> = {
+  'up': { label: 'Up', rotation: 0 },
+  'up-right': { label: 'Up-Right', rotation: 45 },
+  'right': { label: 'Right', rotation: 90 },
+  'down-right': { label: 'Down-Right', rotation: 135 },
+  'down': { label: 'Down', rotation: 180 },
+  'down-left': { label: 'Down-Left', rotation: 225 },
+  'left': { label: 'Left', rotation: 270 },
+  'up-left': { label: 'Up-Left', rotation: 315 },
+};
+
+// Sign holder configuration with number of sides
+export const SIGN_HOLDERS: Record<SignHolderType, { label: string; sides: 1 | 2 }> = {
+  'sign-pedestal-1': { label: 'Sign Pedestal (1-sided)', sides: 1 },
+  'sign-pedestal-2': { label: 'Sign Pedestal (2-sided)', sides: 2 },
 };
 
 export interface FloorPlanEvent {
