@@ -26,6 +26,6 @@ dist-ssr
 # Always track .cursor directory (contains project rules for AI)
 !.cursor
 
-# Always track .env.local (local dev) and .env.production (deployed builds)
-!.env.local
+# Always track .env.development (local dev) and .env.production (deployed builds)
+!.env.development
 !.env.production
