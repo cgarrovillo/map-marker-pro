@@ -7,6 +7,8 @@ export const selectMode = (state: RootState) => state.ui.mode;
 export const selectIsEditMode = (state: RootState) => state.ui.mode === 'edit';
 export const selectSelectedCategory = (state: RootState) => state.ui.selectedCategory;
 export const selectSelectedType = (state: RootState) => state.ui.selectedType;
+export const selectSelectedTicketTypeId = (state: RootState) => state.ui.selectedTicketTypeId;
+export const selectSelectedWashroomSubType = (state: RootState) => state.ui.selectedWashroomSubType;
 export const selectSelectedAnnotationId = (state: RootState) => state.ui.selectedAnnotationId;
 export const selectFocusedCategory = (state: RootState) => state.ui.focusedCategory;
 export const selectLayerVisibility = (state: RootState) => state.ui.layerVisibility;
@@ -33,6 +35,9 @@ export const selectIsAnnotationVisible = createSelector(
 
     const { category, type } = annotation;
     if (category === 'signage') {
+      // Ticket type annotations are always visible when signage layer is visible
+      // (since they are dynamic and don't have per-type visibility toggles)
+      if (type === 'ticket') return true;
       return subLayerVis.signage[type as SignageType] ?? false;
     } else if (category === 'barrier') {
       return subLayerVis.barrier[type as BarrierType] ?? false;

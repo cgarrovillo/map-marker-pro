@@ -1,6 +1,7 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { Upload, X, ArrowUp, ImageIcon, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -20,7 +21,9 @@ import {
   SIGNAGE_TYPES,
   SIGN_DIRECTIONS,
   SIGN_HOLDERS,
+  WASHROOM_SUB_TYPES,
   SignageType,
+  WashroomSubType,
 } from '@/types/annotations';
 import { useSignImageUpload } from '@/hooks/useSignImageUpload';
 import { cn } from '@/lib/utils';
@@ -278,9 +281,21 @@ function getSideData(annotation: Annotation, side: 1 | 2): SignSide | undefined 
 export function SignDetailsPanel({ annotation, onUpdate }: SignDetailsPanelProps) {
   const { uploading, uploadSignImage, deleteSignImage } = useSignImageUpload();
   const [activeTab, setActiveTab] = useState<string>('side1');
+  const [ticketNameInput, setTicketNameInput] = useState<string>(annotation.ticketTypeName || '');
+  
+  // Sync ticketNameInput when annotation changes
+  useEffect(() => {
+    setTicketNameInput(annotation.ticketTypeName || '');
+  }, [annotation.ticketTypeName]);
+  
+  // Get label - for ticket types, use the name; for others, use static config
+  const isTicketType = annotation.type === 'ticket';
+  const isWashroom = annotation.type === 'washroom';
   
   const signageConfig = SIGNAGE_TYPES[annotation.type as SignageType];
-  const signLabel = signageConfig?.label || annotation.type;
+  const signLabel = isTicketType 
+    ? (annotation.ticketTypeName || 'Ticket Type')
+    : (signageConfig?.label || annotation.type);
 
   // Get current holder config (default to 2-sided pedestal)
   const currentHolder = annotation.signHolder || 'sign-pedestal-2';
@@ -349,6 +364,29 @@ export function SignDetailsPanel({ annotation, onUpdate }: SignDetailsPanelProps
     });
   };
 
+  const handleTicketNameChange = (value: string) => {
+    setTicketNameInput(value);
+  };
+
+  const handleTicketNameBlur = () => {
+    const trimmedName = ticketNameInput.trim();
+    if (trimmedName && trimmedName !== annotation.ticketTypeName) {
+      onUpdate({ ticketTypeName: trimmedName });
+    } else if (!trimmedName) {
+      // Reset to original value if empty
+      setTicketNameInput(annotation.ticketTypeName || '');
+    }
+  };
+
+  const handleTicketNameKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.currentTarget.blur();
+    } else if (e.key === 'Escape') {
+      setTicketNameInput(annotation.ticketTypeName || '');
+      e.currentTarget.blur();
+    }
+  };
+
   return (
     <div className="border-t border-border">
       <div className="p-4 border-b border-border">
@@ -357,7 +395,50 @@ export function SignDetailsPanel({ annotation, onUpdate }: SignDetailsPanelProps
       </div>
       
       <div className="p-4 space-y-4">
-        {/* Sign Holder Section - Now at the top */}
+        {/* Ticket Type Name Input - Only for ticket type signs */}
+        {isTicketType && (
+          <>
+            <div className="space-y-2">
+              <Label htmlFor="ticket-name" className="text-xs text-muted-foreground">
+                Ticket Type Name
+              </Label>
+              <Input
+                id="ticket-name"
+                value={ticketNameInput}
+                onChange={(e) => handleTicketNameChange(e.target.value)}
+                onBlur={handleTicketNameBlur}
+                onKeyDown={handleTicketNameKeyDown}
+                placeholder="e.g., VIP, General Admission"
+              />
+              <p className="text-xs text-muted-foreground">
+                Press Enter to save, Escape to cancel
+              </p>
+            </div>
+            <Separator />
+          </>
+        )}
+
+        {/* Washroom Sub-Type Display - Only for washroom signs (read-only, set from sidebar) */}
+        {isWashroom && annotation.washroomSubType && (
+          <>
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground">
+                Washroom Type
+              </Label>
+              <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-secondary/50">
+                <span className="text-sm font-medium">
+                  {WASHROOM_SUB_TYPES[annotation.washroomSubType]?.label || annotation.washroomSubType}
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Set from the Annotations sidebar
+              </p>
+            </div>
+            <Separator />
+          </>
+        )}
+
+        {/* Sign Holder Section */}
         <div className="space-y-2">
           <Label className="text-xs text-muted-foreground">Sign Holder</Label>
           <Select

@@ -140,7 +140,7 @@ function SubLayerRow({
 export function LayersPanel({ 
   annotations, 
   selectedAnnotation, 
-  onUpdateAnnotation 
+  onUpdateAnnotation,
 }: LayersPanelProps) {
   const dispatch = useAppDispatch();
   const layerVisibility = useAppSelector(selectLayerVisibility);

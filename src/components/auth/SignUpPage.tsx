@@ -12,7 +12,6 @@ export function SignUpPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
-  const [organizationName, setOrganizationName] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleSignUp = async (e: React.FormEvent) => {
@@ -41,22 +40,7 @@ export function SignUpPage() {
         return;
       }
 
-      // 2. Create organization and link to user using the database function
-      const { data: orgId, error: orgError } = await supabase.rpc(
-        'create_organization_for_user',
-        {
-          user_id: authData.user.id,
-          org_name: organizationName,
-          user_full_name: fullName,
-        }
-      );
-
-      if (orgError) {
-        console.error('Organization creation error:', orgError);
-        toast.error('Failed to create organization: ' + orgError.message);
-        return;
-      }
-
+      // User is automatically assigned to the default organization via the handle_new_user trigger
       toast.success('Account created successfully!');
       navigate('/');
     } catch {
@@ -129,20 +113,6 @@ export function SignUpPage() {
                 minLength={6}
                 autoComplete="new-password"
               />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="organization">Organization Name</Label>
-              <Input
-                id="organization"
-                type="text"
-                placeholder="Acme Events Inc."
-                value={organizationName}
-                onChange={(e) => setOrganizationName(e.target.value)}
-                required
-              />
-              <p className="text-xs text-muted-foreground">
-                This will be your team's workspace
-              </p>
             </div>
           </CardContent>
           <CardFooter className="flex flex-col gap-4">

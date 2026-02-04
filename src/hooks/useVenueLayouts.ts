@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Tables, TablesInsert, TablesUpdate, Json } from '@/integrations/supabase/types';
-import { Annotation, Point } from '@/types/annotations';
+import { Annotation, Point, WashroomSubType } from '@/types/annotations';
 
 type VenueLayout = Tables<'venue_layouts'>;
 type VenueLayoutInsert = TablesInsert<'venue_layouts'>;
@@ -189,7 +189,9 @@ export function useVenueLayouts(eventId: string | null) {
       category: string,
       type: string,
       points: Point[],
-      label?: string
+      label?: string,
+      ticketTypeName?: string,
+      washroomSubType?: WashroomSubType | null
     ): Promise<Annotation | null> => {
       const layout = layouts.find((l) => l.id === layoutId);
       if (!layout) return null;
@@ -202,6 +204,10 @@ export function useVenueLayouts(eventId: string | null) {
         points,
         label,
         createdAt: Date.now(),
+        // Include ticketTypeName for ticket type signs
+        ...(ticketTypeName && { ticketTypeName }),
+        // Include washroomSubType for washroom signs
+        ...(washroomSubType && { washroomSubType }),
       };
 
       const updatedAnnotations = [...currentAnnotations, newAnnotation];

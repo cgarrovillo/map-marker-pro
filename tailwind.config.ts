@@ -58,11 +58,9 @@ export default {
         signage: {
           DEFAULT: "hsl(var(--signage-primary))",
           ticket: "hsl(var(--signage-ticket))",
-          vip: "hsl(var(--signage-vip))",
           alcohol: "hsl(var(--signage-alcohol))",
           accessibility: "hsl(var(--signage-accessibility))",
           washroom: "hsl(var(--signage-washroom))",
-          area: "hsl(var(--signage-area))",
         },
         barrier: {
           DEFAULT: "hsl(var(--barrier-primary))",

@@ -108,6 +108,38 @@ export type Database = {
           },
         ]
       }
+      ticket_types: {
+        Row: {
+          created_at: string
+          event_id: string
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          event_id: string
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          event_id?: string
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ticket_types_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       venue_layouts: {
         Row: {
           annotations: Json
@@ -151,10 +183,6 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      create_organization_for_user: {
-        Args: { org_name: string; user_full_name: string; user_id: string }
-        Returns: string
-      }
       get_user_organization_id: { Args: { user_uuid: string }; Returns: string }
     }
     Enums: {

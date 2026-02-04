@@ -59,11 +59,9 @@ interface CanvasProps {
 const getTypeColor = (category: AnnotationCategory, type: AnnotationType): string => {
   const colors: Record<string, string> = {
     'signage-ticket': 'hsl(210, 85%, 55%)',
-    'signage-vip': 'hsl(280, 75%, 60%)',
     'signage-alcohol': 'hsl(340, 75%, 55%)',
     'signage-accessibility': 'hsl(200, 80%, 50%)',
     'signage-washroom': 'hsl(230, 70%, 60%)',
-    'signage-area': 'hsl(260, 65%, 55%)',
     'barrier-stanchion': 'hsl(35, 90%, 55%)',
     'barrier-drape': 'hsl(25, 85%, 50%)',
     'flow-ingress': 'hsl(145, 70%, 45%)',
@@ -72,8 +70,19 @@ const getTypeColor = (category: AnnotationCategory, type: AnnotationType): strin
   return colors[`${category}-${type}`] || 'hsl(185, 75%, 55%)';
 };
 
-const getTypeLabel = (category: AnnotationCategory, type: AnnotationType): string => {
-  if (category === 'signage') return SIGNAGE_TYPES[type as keyof typeof SIGNAGE_TYPES]?.label || type;
+const getTypeLabel = (category: AnnotationCategory, type: AnnotationType, annotation?: Annotation): string => {
+  if (category === 'signage') {
+    // For ticket type, use the custom name if available
+    if (type === 'ticket' && annotation?.ticketTypeName) {
+      return annotation.ticketTypeName;
+    }
+    // For washroom, append sub-type if available
+    if (type === 'washroom' && annotation?.washroomSubType) {
+      const subType = annotation.washroomSubType === 'men' ? 'Men' : 'Women';
+      return `${subType}'s Washroom`;
+    }
+    return SIGNAGE_TYPES[type as keyof typeof SIGNAGE_TYPES]?.label || type;
+  }
   if (category === 'barrier') return BARRIER_TYPES[type as keyof typeof BARRIER_TYPES]?.label || type;
   if (category === 'flow') return FLOW_TYPES[type as keyof typeof FLOW_TYPES]?.label || type;
   return type;
@@ -758,7 +767,7 @@ export function Canvas({
                   const isBeingDragged = draggingAnnotation?.id === annotation.id;
                   const isSelected = selectedAnnotationId === annotation.id;
                   const point = isBeingDragged ? draggingAnnotation.currentPoints[0] : annotation.points[0];
-                  const label = getTypeLabel(annotation.category, annotation.type);
+                  const label = getTypeLabel(annotation.category, annotation.type, annotation);
                   const isSignage = annotation.category === 'signage';
 
                   // Signage annotations render as small dots with optional direction arrows

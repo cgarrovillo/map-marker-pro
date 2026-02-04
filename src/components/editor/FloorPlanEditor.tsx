@@ -5,6 +5,7 @@ import { Canvas } from './Canvas';
 import { EventsPanel } from './EventsPanel';
 import { useSupabaseEvents } from '@/hooks/useSupabaseEvents';
 import { useVenueLayouts } from '@/hooks/useVenueLayouts';
+import { useTicketTypes } from '@/hooks/useTicketTypes';
 import { useOrganization } from '@/hooks/useOrganization';
 import { useAuthContext } from '@/components/auth/AuthProvider';
 import { toast } from 'sonner';
@@ -13,7 +14,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { LogOut, Building2, Eye, Edit3, Download, Upload, RotateCcw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAppSelector, useAppDispatch } from '@/store/hooks';
-import { selectMode, selectSelectedCategory, selectSelectedType, selectSelectedAnnotationId } from '@/store/selectors';
+import { selectMode, selectSelectedCategory, selectSelectedType, selectSelectedAnnotationId, selectSelectedTicketTypeId, selectSelectedWashroomSubType } from '@/store/selectors';
 import { setMode, setSelectedAnnotationId } from '@/store/slices/uiSlice';
 import { Annotation } from '@/types/annotations';
 
@@ -26,6 +27,8 @@ export function FloorPlanEditor() {
   const mode = useAppSelector(selectMode);
   const selectedCategory = useAppSelector(selectSelectedCategory);
   const selectedType = useAppSelector(selectSelectedType);
+  const selectedTicketTypeId = useAppSelector(selectSelectedTicketTypeId);
+  const selectedWashroomSubType = useAppSelector(selectSelectedWashroomSubType);
   const selectedAnnotationId = useAppSelector(selectSelectedAnnotationId);
 
   const {
@@ -53,6 +56,13 @@ export function FloorPlanEditor() {
     getAnnotations,
     getImageUrl,
   } = useVenueLayouts(activeEventId);
+
+  const {
+    ticketTypes,
+    loading: ticketTypesLoading,
+    createTicketType,
+    deleteTicketType,
+  } = useTicketTypes(activeEventId);
 
   // Auto-create a layout when selecting an event with no layouts
   useEffect(() => {
@@ -89,8 +99,24 @@ export function FloorPlanEditor() {
   const handleAddAnnotation = useCallback(
     async (points: { x: number; y: number }[], label?: string) => {
       if (!activeLayoutId) return;
+      
+      // If placing a ticket type sign, get the ticket type name
+      let ticketTypeName: string | undefined;
+      if (selectedType === 'ticket' && selectedTicketTypeId) {
+        const selectedTicketType = ticketTypes.find(t => t.id === selectedTicketTypeId);
+        ticketTypeName = selectedTicketType?.name;
+      }
+      
       try {
-        const newAnnotation = await addAnnotation(activeLayoutId, selectedCategory, selectedType, points, label);
+        const newAnnotation = await addAnnotation(
+          activeLayoutId, 
+          selectedCategory, 
+          selectedType, 
+          points, 
+          label,
+          ticketTypeName,
+          selectedType === 'washroom' ? selectedWashroomSubType : undefined
+        );
         // Auto-select the new annotation
         if (newAnnotation) {
           dispatch(setSelectedAnnotationId(newAnnotation.id));
@@ -100,7 +126,7 @@ export function FloorPlanEditor() {
         console.error(error);
       }
     },
-    [activeLayoutId, selectedCategory, selectedType, addAnnotation, dispatch]
+    [activeLayoutId, selectedCategory, selectedType, selectedTicketTypeId, selectedWashroomSubType, ticketTypes, addAnnotation, dispatch]
   );
 
   const handleDeleteAnnotation = useCallback(
@@ -371,9 +397,15 @@ export function FloorPlanEditor() {
           loading={eventsLoading}
         />
 
-        <AnnotationPanel
-          annotations={annotations}
-        />
+        {activeEventId && (
+          <AnnotationPanel
+            annotations={annotations}
+            ticketTypes={ticketTypes}
+            ticketTypesLoading={ticketTypesLoading}
+            onCreateTicketType={createTicketType}
+            onDeleteTicketType={deleteTicketType}
+          />
+        )}
 
         {isLoading ? (
           <div className="flex-1 flex items-center justify-center canvas-grid">

@@ -1,6 +1,9 @@
 export type AnnotationCategory = 'signage' | 'barrier' | 'flow';
 
-export type SignageType = 'ticket' | 'vip' | 'alcohol' | 'accessibility' | 'washroom' | 'area';
+export type SignageType = 'ticket' | 'alcohol' | 'accessibility' | 'washroom';
+
+// Washroom sub-types
+export type WashroomSubType = 'men' | 'women' | 'all';
 export type BarrierType = 'stanchion' | 'drape';
 export type FlowType = 'ingress' | 'egress';
 
@@ -41,6 +44,10 @@ export interface Annotation {
   signHolder?: SignHolderType;
   side1?: SignSide;  // Side 1 details
   side2?: SignSide;  // Side 2 details (only used if holder is 2-sided)
+  // Ticket type specific - user-defined name like "VIP", "General Admission"
+  ticketTypeName?: string;
+  // Washroom specific - "men" or "women"
+  washroomSubType?: WashroomSubType;
   // Deprecated - kept for backwards compatibility, use side1/side2 instead
   imageUrl?: string;
   direction?: SignDirection;
@@ -74,13 +81,18 @@ export interface AnnotationConfig {
   icon: string;
 }
 
-export const SIGNAGE_TYPES: Record<SignageType, { label: string; icon: string }> = {
-  ticket: { label: 'Ticket Line', icon: 'Ticket' },
-  vip: { label: 'VIP', icon: 'Crown' },
+// Static signage types (ticket types are dynamic and loaded from database)
+export const SIGNAGE_TYPES: Partial<Record<SignageType, { label: string; icon: string }>> = {
   alcohol: { label: 'No Alcohol', icon: 'Wine' },
   accessibility: { label: 'Accessibility', icon: 'Accessibility' },
   washroom: { label: 'Washroom', icon: 'Bath' },
-  area: { label: 'Area', icon: 'MapPin' },
+};
+
+// Washroom sub-type configuration
+export const WASHROOM_SUB_TYPES: Record<WashroomSubType, { label: string }> = {
+  all: { label: 'Washrooms' },
+  men: { label: 'Men' },
+  women: { label: 'Women' },
 };
 
 export const BARRIER_TYPES: Record<BarrierType, { label: string; icon: string }> = {
