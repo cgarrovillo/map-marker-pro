@@ -21,11 +21,17 @@ import {
   setFocusedCategory,
 } from '@/store/slices/uiSlice';
 import { SignDetailsPanel } from './SignDetailsPanel';
+import { NotesPanel } from './NotesPanel';
+import { Tables } from '@/integrations/supabase/types';
+
+type SignageType = Tables<'signage_types'>;
 
 interface LayersPanelProps {
   annotations: Annotation[];
   selectedAnnotation: Annotation | null;
   onUpdateAnnotation?: (id: string, updates: Partial<Annotation>) => void;
+  signageTypes?: SignageType[];
+  onUpdateSignageTypeNotes?: (id: string, notes: string | null) => void;
 }
 
 interface LayerRowProps {
@@ -141,6 +147,8 @@ export function LayersPanel({
   annotations, 
   selectedAnnotation, 
   onUpdateAnnotation,
+  signageTypes = [],
+  onUpdateSignageTypeNotes,
 }: LayersPanelProps) {
   const dispatch = useAppDispatch();
   const layerVisibility = useAppSelector(selectLayerVisibility);
@@ -150,9 +158,20 @@ export function LayersPanel({
   // Check if selected annotation is a signage type
   const isSignageSelected = selectedAnnotation?.category === 'signage';
   
+  // Find the signage type for the selected annotation (by matching signageTypeName)
+  const selectedSignageType = isSignageSelected && selectedAnnotation?.signageTypeName
+    ? signageTypes.find((t) => t.name === selectedAnnotation.signageTypeName) ?? null
+    : null;
+  
   const handleSignUpdate = (updates: Partial<Annotation>) => {
     if (selectedAnnotation && onUpdateAnnotation) {
       onUpdateAnnotation(selectedAnnotation.id, updates);
+    }
+  };
+  
+  const handleSignageTypeNotesUpdate = (id: string, notes: string | null) => {
+    if (onUpdateSignageTypeNotes) {
+      onUpdateSignageTypeNotes(id, notes);
     }
   };
 
@@ -262,6 +281,16 @@ export function LayersPanel({
         <SignDetailsPanel
           annotation={selectedAnnotation}
           onUpdate={handleSignUpdate}
+        />
+      )}
+      
+      {/* Notes Panel - shows when a signage annotation is selected */}
+      {isSignageSelected && selectedAnnotation && (
+        <NotesPanel
+          annotation={selectedAnnotation}
+          signageType={selectedSignageType}
+          onUpdateAnnotation={handleSignUpdate}
+          onUpdateSignageTypeNotes={handleSignageTypeNotesUpdate}
         />
       )}
     </div>

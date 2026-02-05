@@ -44,13 +44,19 @@ export interface Annotation {
   signHolder?: SignHolderType;
   side1?: SignSide;  // Side 1 details
   side2?: SignSide;  // Side 2 details (only used if holder is 2-sided)
-  // Ticket type specific - user-defined name like "VIP", "General Admission"
-  ticketTypeName?: string;
-  // Washroom specific - "men" or "women"
+  // Signage type - parent category name like "Tickets", "Washroom", "Accessibility"
+  // (Updated in migration 20260205000000 to support two-level hierarchy)
+  signageTypeName?: string;
+  // Signage sub-type - specific type within a category like "VIP", "Men", "Wheelchair"
+  signageSubTypeName?: string;
+  // Deprecated - washroom sub-types are now handled via signageSubTypeName
+  // Kept for backwards compatibility with old annotations
   washroomSubType?: WashroomSubType;
   // Deprecated - kept for backwards compatibility, use side1/side2 instead
   imageUrl?: string;
   direction?: SignDirection;
+  // Annotation-specific notes
+  notes?: string;
 }
 
 export interface LayerVisibility {

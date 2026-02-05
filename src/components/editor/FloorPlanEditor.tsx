@@ -1,11 +1,13 @@
 import { useCallback, useEffect } from 'react';
+import { useMemo } from 'react';
 import { AnnotationPanel } from './AnnotationPanel';
 import { LayersPanel } from './LayersPanel';
 import { Canvas } from './Canvas';
 import { EventsPanel } from './EventsPanel';
 import { useSupabaseEvents } from '@/hooks/useSupabaseEvents';
 import { useVenueLayouts } from '@/hooks/useVenueLayouts';
-import { useTicketTypes } from '@/hooks/useTicketTypes';
+import { useSignageTypes } from '@/hooks/useSignageTypes';
+import { useSignageSubTypes } from '@/hooks/useSignageSubTypes';
 import { useOrganization } from '@/hooks/useOrganization';
 import { useAuthContext } from '@/components/auth/AuthProvider';
 import { toast } from 'sonner';
@@ -14,7 +16,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { LogOut, Building2, Eye, Edit3, Download, Upload, RotateCcw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAppSelector, useAppDispatch } from '@/store/hooks';
-import { selectMode, selectSelectedCategory, selectSelectedType, selectSelectedAnnotationId, selectSelectedTicketTypeId, selectSelectedWashroomSubType } from '@/store/selectors';
+import { selectMode, selectSelectedCategory, selectSelectedType, selectSelectedAnnotationId, selectSelectedSignageTypeId, selectSelectedSignageSubTypeId } from '@/store/selectors';
 import { setMode, setSelectedAnnotationId } from '@/store/slices/uiSlice';
 import { Annotation } from '@/types/annotations';
 
@@ -27,8 +29,8 @@ export function FloorPlanEditor() {
   const mode = useAppSelector(selectMode);
   const selectedCategory = useAppSelector(selectSelectedCategory);
   const selectedType = useAppSelector(selectSelectedType);
-  const selectedTicketTypeId = useAppSelector(selectSelectedTicketTypeId);
-  const selectedWashroomSubType = useAppSelector(selectSelectedWashroomSubType);
+  const selectedSignageTypeId = useAppSelector(selectSelectedSignageTypeId);
+  const selectedSignageSubTypeId = useAppSelector(selectSelectedSignageSubTypeId);
   const selectedAnnotationId = useAppSelector(selectSelectedAnnotationId);
 
   const {
@@ -58,11 +60,25 @@ export function FloorPlanEditor() {
   } = useVenueLayouts(activeEventId);
 
   const {
-    ticketTypes,
-    loading: ticketTypesLoading,
-    createTicketType,
-    deleteTicketType,
-  } = useTicketTypes(activeEventId);
+    signageTypes,
+    loading: signageTypesLoading,
+    createSignageType,
+    deleteSignageType,
+    updateSignageTypeNotes,
+  } = useSignageTypes(activeLayoutId);
+
+  // Memoize signage type IDs for sub-types hook
+  const signageTypeIds = useMemo(
+    () => signageTypes.map((t) => t.id),
+    [signageTypes]
+  );
+
+  const {
+    subTypesByParent,
+    loading: subTypesLoading,
+    createSubType,
+    deleteSubType,
+  } = useSignageSubTypes(activeLayoutId, signageTypeIds);
 
   // Auto-create a layout when selecting an event with no layouts
   useEffect(() => {
@@ -100,11 +116,21 @@ export function FloorPlanEditor() {
     async (points: { x: number; y: number }[], label?: string) => {
       if (!activeLayoutId) return;
       
-      // If placing a ticket type sign, get the ticket type name
-      let ticketTypeName: string | undefined;
-      if (selectedType === 'ticket' && selectedTicketTypeId) {
-        const selectedTicketType = ticketTypes.find(t => t.id === selectedTicketTypeId);
-        ticketTypeName = selectedTicketType?.name;
+      // For signage annotations with the two-level hierarchy
+      let signageTypeName: string | undefined;
+      let signageSubTypeName: string | undefined;
+      
+      if (selectedType === 'ticket' && selectedSignageTypeId) {
+        // Get the parent signage type name
+        const selectedSignageType = signageTypes.find(t => t.id === selectedSignageTypeId);
+        signageTypeName = selectedSignageType?.name;
+        
+        // Get the sub-type name if one is selected
+        if (selectedSignageSubTypeId) {
+          const parentSubTypes = subTypesByParent[selectedSignageTypeId] || [];
+          const selectedSubType = parentSubTypes.find(st => st.id === selectedSignageSubTypeId);
+          signageSubTypeName = selectedSubType?.name;
+        }
       }
       
       try {
@@ -114,8 +140,8 @@ export function FloorPlanEditor() {
           selectedType, 
           points, 
           label,
-          ticketTypeName,
-          selectedType === 'washroom' ? selectedWashroomSubType : undefined
+          signageTypeName,
+          signageSubTypeName
         );
         // Auto-select the new annotation
         if (newAnnotation) {
@@ -126,7 +152,7 @@ export function FloorPlanEditor() {
         console.error(error);
       }
     },
-    [activeLayoutId, selectedCategory, selectedType, selectedTicketTypeId, selectedWashroomSubType, ticketTypes, addAnnotation, dispatch]
+    [activeLayoutId, selectedCategory, selectedType, selectedSignageTypeId, selectedSignageSubTypeId, signageTypes, subTypesByParent, addAnnotation, dispatch]
   );
 
   const handleDeleteAnnotation = useCallback(
@@ -400,10 +426,14 @@ export function FloorPlanEditor() {
         {activeEventId && (
           <AnnotationPanel
             annotations={annotations}
-            ticketTypes={ticketTypes}
-            ticketTypesLoading={ticketTypesLoading}
-            onCreateTicketType={createTicketType}
-            onDeleteTicketType={deleteTicketType}
+            signageTypes={signageTypes}
+            signageTypesLoading={signageTypesLoading}
+            subTypesByParent={subTypesByParent}
+            subTypesLoading={subTypesLoading}
+            onCreateSignageType={createSignageType}
+            onDeleteSignageType={deleteSignageType}
+            onCreateSubType={createSubType}
+            onDeleteSubType={deleteSubType}
           />
         )}
 
@@ -452,6 +482,8 @@ export function FloorPlanEditor() {
           annotations={annotations}
           selectedAnnotation={selectedAnnotation}
           onUpdateAnnotation={handleUpdateAnnotation}
+          signageTypes={signageTypes}
+          onUpdateSignageTypeNotes={updateSignageTypeNotes}
         />
       </div>
     </div>

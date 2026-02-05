@@ -190,8 +190,8 @@ export function useVenueLayouts(eventId: string | null) {
       type: string,
       points: Point[],
       label?: string,
-      ticketTypeName?: string,
-      washroomSubType?: WashroomSubType | null
+      signageTypeName?: string,
+      signageSubTypeName?: string
     ): Promise<Annotation | null> => {
       const layout = layouts.find((l) => l.id === layoutId);
       if (!layout) return null;
@@ -204,10 +204,10 @@ export function useVenueLayouts(eventId: string | null) {
         points,
         label,
         createdAt: Date.now(),
-        // Include ticketTypeName for ticket type signs
-        ...(ticketTypeName && { ticketTypeName }),
-        // Include washroomSubType for washroom signs
-        ...(washroomSubType && { washroomSubType }),
+        // Include signageTypeName for parent signage type
+        ...(signageTypeName && { signageTypeName }),
+        // Include signageSubTypeName for the specific sub-type
+        ...(signageSubTypeName && { signageSubTypeName }),
       };
 
       const updatedAnnotations = [...currentAnnotations, newAnnotation];

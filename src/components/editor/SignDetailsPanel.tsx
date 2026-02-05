@@ -281,12 +281,12 @@ function getSideData(annotation: Annotation, side: 1 | 2): SignSide | undefined 
 export function SignDetailsPanel({ annotation, onUpdate }: SignDetailsPanelProps) {
   const { uploading, uploadSignImage, deleteSignImage } = useSignImageUpload();
   const [activeTab, setActiveTab] = useState<string>('side1');
-  const [ticketNameInput, setTicketNameInput] = useState<string>(annotation.ticketTypeName || '');
+  const [signageNameInput, setSignageNameInput] = useState<string>(annotation.signageTypeName || '');
   
-  // Sync ticketNameInput when annotation changes
+  // Sync signageNameInput when annotation changes
   useEffect(() => {
-    setTicketNameInput(annotation.ticketTypeName || '');
-  }, [annotation.ticketTypeName]);
+    setSignageNameInput(annotation.signageTypeName || '');
+  }, [annotation.signageTypeName]);
   
   // Get label - for ticket types, use the name; for others, use static config
   const isTicketType = annotation.type === 'ticket';
@@ -294,7 +294,7 @@ export function SignDetailsPanel({ annotation, onUpdate }: SignDetailsPanelProps
   
   const signageConfig = SIGNAGE_TYPES[annotation.type as SignageType];
   const signLabel = isTicketType 
-    ? (annotation.ticketTypeName || 'Ticket Type')
+    ? (annotation.signageTypeName || 'Signage Type')
     : (signageConfig?.label || annotation.type);
 
   // Get current holder config (default to 2-sided pedestal)
@@ -364,25 +364,25 @@ export function SignDetailsPanel({ annotation, onUpdate }: SignDetailsPanelProps
     });
   };
 
-  const handleTicketNameChange = (value: string) => {
-    setTicketNameInput(value);
+  const handleSignageNameChange = (value: string) => {
+    setSignageNameInput(value);
   };
 
-  const handleTicketNameBlur = () => {
-    const trimmedName = ticketNameInput.trim();
-    if (trimmedName && trimmedName !== annotation.ticketTypeName) {
-      onUpdate({ ticketTypeName: trimmedName });
+  const handleSignageNameBlur = () => {
+    const trimmedName = signageNameInput.trim();
+    if (trimmedName && trimmedName !== annotation.signageTypeName) {
+      onUpdate({ signageTypeName: trimmedName });
     } else if (!trimmedName) {
       // Reset to original value if empty
-      setTicketNameInput(annotation.ticketTypeName || '');
+      setSignageNameInput(annotation.signageTypeName || '');
     }
   };
 
-  const handleTicketNameKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleSignageNameKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       e.currentTarget.blur();
     } else if (e.key === 'Escape') {
-      setTicketNameInput(annotation.ticketTypeName || '');
+      setSignageNameInput(annotation.signageTypeName || '');
       e.currentTarget.blur();
     }
   };
@@ -395,19 +395,19 @@ export function SignDetailsPanel({ annotation, onUpdate }: SignDetailsPanelProps
       </div>
       
       <div className="p-4 space-y-4">
-        {/* Ticket Type Name Input - Only for ticket type signs */}
+        {/* Signage Type Name Input - Only for signage type signs */}
         {isTicketType && (
           <>
             <div className="space-y-2">
-              <Label htmlFor="ticket-name" className="text-xs text-muted-foreground">
-                Ticket Type Name
+              <Label htmlFor="signage-name" className="text-xs text-muted-foreground">
+                Signage Type Name
               </Label>
               <Input
-                id="ticket-name"
-                value={ticketNameInput}
-                onChange={(e) => handleTicketNameChange(e.target.value)}
-                onBlur={handleTicketNameBlur}
-                onKeyDown={handleTicketNameKeyDown}
+                id="signage-name"
+                value={signageNameInput}
+                onChange={(e) => handleSignageNameChange(e.target.value)}
+                onBlur={handleSignageNameBlur}
+                onKeyDown={handleSignageNameKeyDown}
                 placeholder="e.g., VIP, General Admission"
               />
               <p className="text-xs text-muted-foreground">

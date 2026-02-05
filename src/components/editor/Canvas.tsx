@@ -6,7 +6,6 @@ import { Slider } from '@/components/ui/slider';
 import {
   Annotation,
   Point,
-  SIGNAGE_TYPES,
   BARRIER_TYPES,
   FLOW_TYPES,
   SIGN_DIRECTIONS,
@@ -72,16 +71,20 @@ const getTypeColor = (category: AnnotationCategory, type: AnnotationType): strin
 
 const getTypeLabel = (category: AnnotationCategory, type: AnnotationType, annotation?: Annotation): string => {
   if (category === 'signage') {
-    // For ticket type, use the custom name if available
-    if (type === 'ticket' && annotation?.ticketTypeName) {
-      return annotation.ticketTypeName;
+    // For the two-level hierarchy: show "ParentType - SubType" or just "ParentType"
+    if (annotation?.signageTypeName) {
+      if (annotation.signageSubTypeName) {
+        return `${annotation.signageTypeName} - ${annotation.signageSubTypeName}`;
+      }
+      return annotation.signageTypeName;
     }
-    // For washroom, append sub-type if available
+    // Legacy support: washroomSubType for old annotations
     if (type === 'washroom' && annotation?.washroomSubType) {
-      const subType = annotation.washroomSubType === 'men' ? 'Men' : 'Women';
-      return `${subType}'s Washroom`;
+      const subType = annotation.washroomSubType === 'men' ? 'Men' : annotation.washroomSubType === 'women' ? 'Women' : 'All Gender';
+      return `Washroom - ${subType}`;
     }
-    return SIGNAGE_TYPES[type as keyof typeof SIGNAGE_TYPES]?.label || type;
+    // Fallback to type name
+    return type;
   }
   if (category === 'barrier') return BARRIER_TYPES[type as keyof typeof BARRIER_TYPES]?.label || type;
   if (category === 'flow') return FLOW_TYPES[type as keyof typeof FLOW_TYPES]?.label || type;

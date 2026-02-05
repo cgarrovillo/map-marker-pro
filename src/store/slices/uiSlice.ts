@@ -35,8 +35,9 @@ interface UiState {
   mode: EditorMode;
   selectedCategory: AnnotationCategory;
   selectedType: AnnotationType;
-  selectedTicketTypeId: string | null;  // ID of selected ticket type (from database)
-  selectedWashroomSubType: WashroomSubType | null;  // Selected washroom sub-type (men/women)
+  selectedSignageTypeId: string | null;  // ID of selected signage type (from database)
+  selectedSignageSubTypeId: string | null;  // ID of selected signage sub-type (from database)
+  selectedWashroomSubType: WashroomSubType | null;  // Deprecated - kept for backwards compatibility
   selectedAnnotationId: string | null;
   focusedCategory: AnnotationCategory | null;
   layerVisibility: LayerVisibility;
@@ -48,7 +49,8 @@ const initialState: UiState = {
   mode: 'edit',
   selectedCategory: 'signage',
   selectedType: 'alcohol',
-  selectedTicketTypeId: null,
+  selectedSignageTypeId: null,
+  selectedSignageSubTypeId: null,
   selectedWashroomSubType: null,
   selectedAnnotationId: null,
   focusedCategory: null,
@@ -78,18 +80,35 @@ const uiSlice = createSlice({
     ) => {
       state.selectedCategory = action.payload.category;
       state.selectedType = action.payload.type;
-      // Clear ticket type selection when selecting a non-ticket type
-      state.selectedTicketTypeId = null;
-      // Clear washroom sub-type selection when selecting a non-washroom type
+      // Clear signage type/sub-type selection when selecting a different type
+      state.selectedSignageTypeId = null;
+      state.selectedSignageSubTypeId = null;
+      // Clear washroom sub-type selection (deprecated)
       state.selectedWashroomSubType = null;
     },
-    setSelectedTicketTypeId: (state, action: PayloadAction<string | null>) => {
-      state.selectedTicketTypeId = action.payload;
-      // When selecting a ticket type, set category to signage and type to ticket
+    setSelectedSignageTypeId: (state, action: PayloadAction<string | null>) => {
+      state.selectedSignageTypeId = action.payload;
+      // Clear sub-type selection when changing parent type
+      state.selectedSignageSubTypeId = null;
+      // When selecting a signage type, set category to signage and type to ticket
       if (action.payload) {
         state.selectedCategory = 'signage';
         state.selectedType = 'ticket';
         state.selectedWashroomSubType = null;
+      }
+    },
+    setSelectedSignageSubTypeId: (
+      state,
+      action: PayloadAction<{ signageTypeId: string; subTypeId: string } | null>
+    ) => {
+      if (action.payload) {
+        state.selectedSignageTypeId = action.payload.signageTypeId;
+        state.selectedSignageSubTypeId = action.payload.subTypeId;
+        state.selectedCategory = 'signage';
+        state.selectedType = 'ticket';
+        state.selectedWashroomSubType = null;
+      } else {
+        state.selectedSignageSubTypeId = null;
       }
     },
     setSelectedWashroomSubType: (state, action: PayloadAction<WashroomSubType | null>) => {
@@ -98,7 +117,8 @@ const uiSlice = createSlice({
       if (action.payload) {
         state.selectedCategory = 'signage';
         state.selectedType = 'washroom';
-        state.selectedTicketTypeId = null;
+        state.selectedSignageTypeId = null;
+        state.selectedSignageSubTypeId = null;
       }
     },
     setSelectedAnnotationId: (state, action: PayloadAction<string | null>) => {
@@ -135,7 +155,8 @@ const uiSlice = createSlice({
 export const {
   setMode,
   selectAnnotationType,
-  setSelectedTicketTypeId,
+  setSelectedSignageTypeId,
+  setSelectedSignageSubTypeId,
   setSelectedWashroomSubType,
   setSelectedAnnotationId,
   setFocusedCategory,

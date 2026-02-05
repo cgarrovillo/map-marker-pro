@@ -108,34 +108,75 @@ export type Database = {
           },
         ]
       }
-      ticket_types: {
+      signage_types: {
         Row: {
           created_at: string
-          event_id: string
+          venue_layout_id: string
+          id: string
+          name: string
+          is_default: boolean
+          icon: string | null
+          notes: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          venue_layout_id: string
+          id?: string
+          name: string
+          is_default?: boolean
+          icon?: string | null
+          notes?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          venue_layout_id?: string
+          id?: string
+          name?: string
+          is_default?: boolean
+          icon?: string | null
+          notes?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "signage_types_venue_layout_id_fkey"
+            columns: ["venue_layout_id"]
+            isOneToOne: false
+            referencedRelation: "venue_layouts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      signage_sub_types: {
+        Row: {
+          created_at: string
+          signage_type_id: string
           id: string
           name: string
           updated_at: string
         }
         Insert: {
           created_at?: string
-          event_id: string
+          signage_type_id: string
           id?: string
           name: string
           updated_at?: string
         }
         Update: {
           created_at?: string
-          event_id?: string
+          signage_type_id?: string
           id?: string
           name?: string
           updated_at?: string
         }
         Relationships: [
           {
-            foreignKeyName: "ticket_types_event_id_fkey"
-            columns: ["event_id"]
+            foreignKeyName: "signage_sub_types_signage_type_id_fkey"
+            columns: ["signage_type_id"]
             isOneToOne: false
-            referencedRelation: "events"
+            referencedRelation: "signage_types"
             referencedColumns: ["id"]
           },
         ]
