@@ -75,6 +75,7 @@ export type Database = {
       }
       signage_sub_types: {
         Row: {
+          color: string | null
           created_at: string
           id: string
           name: string
@@ -82,6 +83,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          color?: string | null
           created_at?: string
           id?: string
           name: string
@@ -89,6 +91,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          color?: string | null
           created_at?: string
           id?: string
           name?: string
@@ -107,6 +110,7 @@ export type Database = {
       }
       signage_types: {
         Row: {
+          color: string | null
           created_at: string
           icon: string | null
           id: string
@@ -117,6 +121,7 @@ export type Database = {
           venue_layout_id: string
         }
         Insert: {
+          color?: string | null
           created_at?: string
           icon?: string | null
           id?: string
@@ -127,6 +132,7 @@ export type Database = {
           venue_layout_id: string
         }
         Update: {
+          color?: string | null
           created_at?: string
           icon?: string | null
           id?: string

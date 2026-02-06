@@ -36,6 +36,7 @@ import {
 import { selectAnnotationType, setSelectedSignageTypeId, setSelectedSignageSubTypeId } from '@/store/slices/uiSlice';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { ColorPicker } from '@/components/ui/ColorPicker';
 
 type SignageType = Tables<'signage_types'>;
 type SignageSubType = Tables<'signage_sub_types'>;
@@ -59,18 +60,26 @@ function getSignageIcon(icon: string | null): React.ComponentType<{ className?: 
   return Ticket; // Default fallback
 }
 
-// Get background color class for signage type based on name/icon
-function getSignageColorClass(signageType: SignageType): string {
-  switch (signageType.name) {
-    case 'No Alcohol':
-      return 'bg-signage-alcohol';
-    case 'Accessibility':
-      return 'bg-signage-accessibility';
-    case 'Washroom':
-      return 'bg-signage-washroom';
-    default:
-      return 'bg-signage-ticket';
-  }
+// Default colors for signage types based on name
+const DEFAULT_SIGNAGE_COLORS: Record<string, string> = {
+  'Tickets': '#3B82F6',
+  'No Alcohol': '#EF4444',
+  'Accessibility': '#22C55E',
+  'Washroom': '#06B6D4',
+  'Parking': '#F59E0B',
+  'VIP Entry': '#8B5CF6',
+};
+
+// Get the actual color for a signage type (custom or default)
+function getSignageColor(signageType: SignageType): string {
+  if (signageType.color) return signageType.color;
+  return DEFAULT_SIGNAGE_COLORS[signageType.name] || '#3B82F6';
+}
+
+// Get the actual color for a sub-type (custom, parent, or default)
+function getSubTypeColor(subType: SignageSubType, parentType: SignageType): string {
+  if (subType.color) return subType.color;
+  return getSignageColor(parentType);
 }
 
 interface AnnotationPanelProps {
@@ -83,6 +92,8 @@ interface AnnotationPanelProps {
   onDeleteSignageType: (id: string) => Promise<void>;
   onCreateSubType: (signageTypeId: string, name: string) => Promise<SignageSubType | null>;
   onDeleteSubType: (signageTypeId: string, subTypeId: string) => Promise<void>;
+  onUpdateSignageTypeColor: (id: string, color: string) => Promise<void>;
+  onUpdateSubTypeColor: (signageTypeId: string, subTypeId: string, color: string) => Promise<void>;
 }
 
 interface CategorySectionProps {
@@ -228,22 +239,25 @@ function AddTypeForm({
 function SubTypeItem({
   subType,
   signageTypeId,
+  parentType,
   isSelected,
   isEditMode,
   onSelect,
   onDelete,
-  colorClass,
+  onColorChange,
   Icon,
 }: {
   subType: SignageSubType;
   signageTypeId: string;
+  parentType: SignageType;
   isSelected: boolean;
   isEditMode: boolean;
   onSelect: () => void;
   onDelete: () => void;
-  colorClass: string;
+  onColorChange: (color: string) => void;
   Icon: React.ComponentType<{ className?: string }>;
 }) {
+  const color = getSubTypeColor(subType, parentType);
   const [showDelete, setShowDelete] = useState(false);
 
   return (
@@ -256,13 +270,32 @@ function SubTypeItem({
         onClick={() => isEditMode && onSelect()}
         disabled={!isEditMode}
         className={cn(
-          'w-full flex items-center gap-3 pl-9 pr-3 py-1.5 rounded-lg text-sm transition-all',
+          'w-full flex items-center gap-2 pl-9 pr-3 py-1.5 rounded-lg text-sm transition-all',
           isEditMode && 'hover:bg-secondary cursor-pointer',
           !isEditMode && 'opacity-60 cursor-default',
           isSelected && 'bg-secondary ring-1 ring-primary'
         )}
       >
-        <div className={cn('w-5 h-5 rounded flex items-center justify-center', colorClass)}>
+        {/* Color picker for sub-type */}
+        {isEditMode && (
+          <div onClick={(e) => e.stopPropagation()}>
+            <ColorPicker
+              color={subType.color}
+              onChange={onColorChange}
+              defaultColor={getSignageColor(parentType)}
+            />
+          </div>
+        )}
+        {!isEditMode && (
+          <div
+            className="h-4 w-4 rounded-full border border-border"
+            style={{ backgroundColor: color }}
+          />
+        )}
+        <div
+          className="w-5 h-5 rounded flex items-center justify-center"
+          style={{ backgroundColor: color }}
+        >
           <Icon className="w-3 h-3 text-white" />
         </div>
         <span className={cn('flex-1 text-left text-sm', isSelected && 'text-foreground font-medium')}>
@@ -296,6 +329,8 @@ function SignageTypeAccordionItem({
   onAddSubType,
   onDeleteSubType,
   onDeleteSignageType,
+  onColorChange,
+  onSubTypeColorChange,
 }: {
   signageType: SignageType;
   subTypes: SignageSubType[];
@@ -306,6 +341,8 @@ function SignageTypeAccordionItem({
   onAddSubType: (signageTypeId: string, name: string) => void;
   onDeleteSubType: (signageTypeId: string, subTypeId: string) => void;
   onDeleteSignageType: (id: string) => void;
+  onColorChange: (color: string) => void;
+  onSubTypeColorChange: (subTypeId: string, color: string) => void;
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isAddingSubType, setIsAddingSubType] = useState(false);
@@ -313,7 +350,7 @@ function SignageTypeAccordionItem({
 
   // Check if this parent type is selected (via one of its sub-types)
   const isParentSelected = selectedSignageTypeId === signageType.id;
-  const colorClass = getSignageColorClass(signageType);
+  const color = getSignageColor(signageType);
   const Icon = getSignageIcon(signageType.icon);
 
   const handleAdd = (name: string) => {
@@ -332,13 +369,32 @@ function SignageTypeAccordionItem({
         <button
           onClick={() => setIsExpanded(!isExpanded)}
           className={cn(
-            'w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all',
+            'w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all',
             isEditMode && 'hover:bg-secondary cursor-pointer',
             !isEditMode && 'opacity-60 cursor-default',
             isParentSelected && 'bg-secondary/50'
           )}
         >
-          <div className={cn('w-6 h-6 rounded-md flex items-center justify-center', colorClass)}>
+          {/* Color picker for signage type */}
+          {isEditMode && (
+            <div onClick={(e) => e.stopPropagation()}>
+              <ColorPicker
+                color={signageType.color}
+                onChange={onColorChange}
+                defaultColor={DEFAULT_SIGNAGE_COLORS[signageType.name] || '#3B82F6'}
+              />
+            </div>
+          )}
+          {!isEditMode && (
+            <div
+              className="h-5 w-5 rounded-full border border-border"
+              style={{ backgroundColor: color }}
+            />
+          )}
+          <div
+            className="w-6 h-6 rounded-md flex items-center justify-center"
+            style={{ backgroundColor: color }}
+          >
             <Icon className="w-4 h-4 text-white" />
           </div>
           <span className={cn('flex-1 text-left', isParentSelected && 'text-foreground font-medium')}>
@@ -382,11 +438,12 @@ function SignageTypeAccordionItem({
                 key={subType.id}
                 subType={subType}
                 signageTypeId={signageType.id}
+                parentType={signageType}
                 isSelected={selectedSignageTypeId === signageType.id && selectedSignageSubTypeId === subType.id}
                 isEditMode={isEditMode}
                 onSelect={() => onSelectSubType(signageType.id, subType.id)}
                 onDelete={() => onDeleteSubType(signageType.id, subType.id)}
-                colorClass={colorClass}
+                onColorChange={(color) => onSubTypeColorChange(subType.id, color)}
                 Icon={Icon}
               />
             ))
@@ -433,6 +490,8 @@ function SignagesSection({
   onDeleteSignageType,
   onAddSubType,
   onDeleteSubType,
+  onUpdateSignageTypeColor,
+  onUpdateSubTypeColor,
 }: {
   signageTypes: SignageType[];
   signageTypesLoading: boolean;
@@ -446,6 +505,8 @@ function SignagesSection({
   onDeleteSignageType: (id: string) => void;
   onAddSubType: (signageTypeId: string, name: string) => void;
   onDeleteSubType: (signageTypeId: string, subTypeId: string) => void;
+  onUpdateSignageTypeColor: (id: string, color: string) => void;
+  onUpdateSubTypeColor: (signageTypeId: string, subTypeId: string, color: string) => void;
 }) {
   const [isExpanded, setIsExpanded] = useState(true);
   const [isAddingSignageType, setIsAddingSignageType] = useState(false);
@@ -493,6 +554,8 @@ function SignagesSection({
                 onAddSubType={onAddSubType}
                 onDeleteSubType={onDeleteSubType}
                 onDeleteSignageType={onDeleteSignageType}
+                onColorChange={(color) => onUpdateSignageTypeColor(signageType.id, color)}
+                onSubTypeColorChange={(subTypeId, color) => onUpdateSubTypeColor(signageType.id, subTypeId, color)}
               />
             ))
           )}
@@ -532,6 +595,8 @@ export function AnnotationPanel({
   onDeleteSignageType,
   onCreateSubType,
   onDeleteSubType,
+  onUpdateSignageTypeColor,
+  onUpdateSubTypeColor,
 }: AnnotationPanelProps) {
   const dispatch = useAppDispatch();
   const selectedCategory = useAppSelector(selectSelectedCategory);
@@ -633,6 +698,8 @@ export function AnnotationPanel({
           onDeleteSignageType={handleDeleteSignageType}
           onAddSubType={handleAddSubType}
           onDeleteSubType={handleDeleteSubType}
+          onUpdateSignageTypeColor={onUpdateSignageTypeColor}
+          onUpdateSubTypeColor={onUpdateSubTypeColor}
         />
 
         <CategorySection
