@@ -73,6 +73,79 @@ export type Database = {
         }
         Relationships: []
       }
+      signage_sub_types: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          signage_type_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          signage_type_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          signage_type_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "signage_sub_types_signage_type_id_fkey"
+            columns: ["signage_type_id"]
+            isOneToOne: false
+            referencedRelation: "signage_types"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      signage_types: {
+        Row: {
+          created_at: string
+          icon: string | null
+          id: string
+          is_default: boolean
+          name: string
+          notes: string | null
+          updated_at: string
+          venue_layout_id: string
+        }
+        Insert: {
+          created_at?: string
+          icon?: string | null
+          id?: string
+          is_default?: boolean
+          name: string
+          notes?: string | null
+          updated_at?: string
+          venue_layout_id: string
+        }
+        Update: {
+          created_at?: string
+          icon?: string | null
+          id?: string
+          is_default?: boolean
+          name?: string
+          notes?: string | null
+          updated_at?: string
+          venue_layout_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "signage_types_venue_layout_id_fkey"
+            columns: ["venue_layout_id"]
+            isOneToOne: false
+            referencedRelation: "venue_layouts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       users: {
         Row: {
           created_at: string
@@ -104,79 +177,6 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      signage_types: {
-        Row: {
-          created_at: string
-          venue_layout_id: string
-          id: string
-          name: string
-          is_default: boolean
-          icon: string | null
-          notes: string | null
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          venue_layout_id: string
-          id?: string
-          name: string
-          is_default?: boolean
-          icon?: string | null
-          notes?: string | null
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          venue_layout_id?: string
-          id?: string
-          name?: string
-          is_default?: boolean
-          icon?: string | null
-          notes?: string | null
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "signage_types_venue_layout_id_fkey"
-            columns: ["venue_layout_id"]
-            isOneToOne: false
-            referencedRelation: "venue_layouts"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      signage_sub_types: {
-        Row: {
-          created_at: string
-          signage_type_id: string
-          id: string
-          name: string
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          signage_type_id: string
-          id?: string
-          name: string
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          signage_type_id?: string
-          id?: string
-          name?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "signage_sub_types_signage_type_id_fkey"
-            columns: ["signage_type_id"]
-            isOneToOne: false
-            referencedRelation: "signage_types"
             referencedColumns: ["id"]
           },
         ]
@@ -224,7 +224,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      get_user_organization_id: { Args: { user_uuid: string }; Returns: string }
+      [_ in never]: never
     }
     Enums: {
       [_ in never]: never

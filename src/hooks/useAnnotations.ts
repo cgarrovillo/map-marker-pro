@@ -14,11 +14,9 @@ const generateId = () => Math.random().toString(36).substring(2, 9);
 const initialSubLayerVisibility: SubLayerVisibility = {
   signage: {
     ticket: true,
-    vip: true,
     alcohol: true,
     accessibility: true,
     washroom: true,
-    area: true,
   },
   barrier: {
     stanchion: true,
