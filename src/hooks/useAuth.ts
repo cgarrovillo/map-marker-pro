@@ -40,7 +40,8 @@ export function useAuth() {
       }
 
       // 2. Create organization and link to user using the database function
-      const { data: orgId, error: orgError } = await supabase.rpc(
+      // Using type assertion since the function exists but isn't in generated types
+      const { data: orgId, error: orgError } = await (supabase.rpc as any)(
         'create_organization_for_user',
         {
           user_id: authData.user.id,
