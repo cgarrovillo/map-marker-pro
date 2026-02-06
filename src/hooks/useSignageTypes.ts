@@ -181,6 +181,29 @@ export function useSignageTypes(venueLayoutId: string | null) {
     [signageTypes]
   );
 
+  const updateSignageTypeColor = useCallback(
+    async (id: string, color: string | null) => {
+      // Optimistic update
+      const previousTypes = signageTypes;
+      setSignageTypes((prev) =>
+        prev.map((t) => (t.id === id ? { ...t, color } : t))
+      );
+
+      const { error } = await supabase
+        .from('signage_types')
+        .update({ color })
+        .eq('id', id);
+
+      if (error) {
+        console.error('Error updating signage type color:', error);
+        // Revert on error
+        setSignageTypes(previousTypes);
+        throw error;
+      }
+    },
+    [signageTypes]
+  );
+
   return {
     signageTypes,
     loading,
@@ -188,5 +211,6 @@ export function useSignageTypes(venueLayoutId: string | null) {
     deleteSignageType,
     renameSignageType,
     updateSignageTypeNotes,
+    updateSignageTypeColor,
   };
 }

@@ -65,6 +65,7 @@ export function FloorPlanEditor() {
     createSignageType,
     deleteSignageType,
     updateSignageTypeNotes,
+    updateSignageTypeColor,
   } = useSignageTypes(activeLayoutId);
 
   // Memoize signage type IDs for sub-types hook
@@ -78,6 +79,7 @@ export function FloorPlanEditor() {
     loading: subTypesLoading,
     createSubType,
     deleteSubType,
+    updateSubTypeColor,
   } = useSignageSubTypes(activeLayoutId, signageTypeIds);
 
   // Auto-create a layout when selecting an event with no layouts
@@ -434,6 +436,8 @@ export function FloorPlanEditor() {
             onDeleteSignageType={deleteSignageType}
             onCreateSubType={createSubType}
             onDeleteSubType={deleteSubType}
+            onUpdateSignageTypeColor={updateSignageTypeColor}
+            onUpdateSubTypeColor={updateSubTypeColor}
           />
         )}
 
