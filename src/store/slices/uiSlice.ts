@@ -69,7 +69,7 @@ const uiSlice = createSlice({
   reducers: {
     setMode: (state, action: PayloadAction<EditorMode>) => {
       state.mode = action.payload;
-      if (action.payload === 'view') {
+      if (action.payload === 'view' || action.payload === 'assets') {
         state.selectedAnnotationId = null;
         state.pendingLine = null;
       }

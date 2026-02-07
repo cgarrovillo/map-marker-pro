@@ -13,12 +13,13 @@ import { useAuthContext } from '@/components/auth/AuthProvider';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { LogOut, Building2, Eye, Edit3, Download, Upload, RotateCcw } from 'lucide-react';
+import { LogOut, Building2, Eye, Edit3, Download, Upload, RotateCcw, Package } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAppSelector, useAppDispatch } from '@/store/hooks';
-import { selectMode, selectSelectedCategory, selectSelectedType, selectSelectedAnnotationId, selectSelectedSignageTypeId, selectSelectedSignageSubTypeId } from '@/store/selectors';
+import { selectMode, selectIsAssetsMode, selectSelectedCategory, selectSelectedType, selectSelectedAnnotationId, selectSelectedSignageTypeId, selectSelectedSignageSubTypeId } from '@/store/selectors';
 import { setMode, setSelectedAnnotationId } from '@/store/slices/uiSlice';
-import { Annotation } from '@/types/annotations';
+import { Annotation, EditorMode } from '@/types/annotations';
+import { AssetsDashboard } from '@/components/assets/AssetsDashboard';
 
 export function FloorPlanEditor() {
   const dispatch = useAppDispatch();
@@ -27,6 +28,7 @@ export function FloorPlanEditor() {
 
   // Redux state
   const mode = useAppSelector(selectMode);
+  const isAssetsMode = useAppSelector(selectIsAssetsMode);
   const selectedCategory = useAppSelector(selectSelectedCategory);
   const selectedType = useAppSelector(selectSelectedType);
   const selectedSignageTypeId = useAppSelector(selectSelectedSignageTypeId);
@@ -284,7 +286,7 @@ export function FloorPlanEditor() {
   };
 
   const handleSetMode = useCallback(
-    (newMode: 'edit' | 'view') => {
+    (newMode: EditorMode) => {
       dispatch(setMode(newMode));
     },
     [dispatch]
@@ -346,6 +348,23 @@ export function FloorPlanEditor() {
               </button>
             </TooltipTrigger>
             <TooltipContent>View only mode</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={() => handleSetMode('assets')}
+                className={cn(
+                  'flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all',
+                  mode === 'assets'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'text-muted-foreground hover:text-foreground'
+                )}
+              >
+                <Package className="w-4 h-4" />
+                Assets
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>Asset management dashboard</TooltipContent>
           </Tooltip>
         </div>
 
@@ -425,70 +444,81 @@ export function FloorPlanEditor() {
           loading={eventsLoading}
         />
 
-        {activeEventId && (
-          <AnnotationPanel
+        {isAssetsMode ? (
+          <AssetsDashboard
             annotations={annotations}
-            signageTypes={signageTypes}
-            signageTypesLoading={signageTypesLoading}
-            subTypesByParent={subTypesByParent}
-            subTypesLoading={subTypesLoading}
-            onCreateSignageType={createSignageType}
-            onDeleteSignageType={deleteSignageType}
-            onCreateSubType={createSubType}
-            onDeleteSubType={deleteSubType}
-            onUpdateSignageTypeColor={updateSignageTypeColor}
-            onUpdateSubTypeColor={updateSubTypeColor}
-          />
-        )}
-
-        {isLoading ? (
-          <div className="flex-1 flex items-center justify-center canvas-grid">
-            <div className="flex flex-col items-center gap-4">
-              <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-              <p className="text-sm text-muted-foreground">Loading...</p>
-            </div>
-          </div>
-        ) : activeEvent && activeLayout ? (
-          <Canvas
-            image={imageUrl}
-            onImageUpload={handleImageUpload}
-            annotations={annotations}
-            onAddAnnotation={handleAddAnnotation}
-            onDeleteAnnotation={handleDeleteAnnotation}
             onUpdateAnnotation={handleUpdateAnnotation}
+            activeLayout={activeLayout}
+            activeEvent={activeEvent}
           />
         ) : (
-          <div className="flex-1 flex items-center justify-center canvas-grid">
-            <div className="text-center">
-              <div className="w-16 h-16 rounded-full bg-secondary mx-auto mb-4 flex items-center justify-center">
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  className="w-8 h-8 text-muted-foreground"
-                >
-                  <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-                  <polyline points="9 22 9 12 15 12 15 22" />
-                </svg>
-              </div>
-              <p className="text-lg font-medium text-muted-foreground">
-                Select or create an event
-              </p>
-              <p className="text-sm text-muted-foreground/70 mt-1">
-                Use the Events panel on the left to get started
-              </p>
-            </div>
-          </div>
-        )}
+          <>
+            {activeEventId && (
+              <AnnotationPanel
+                annotations={annotations}
+                signageTypes={signageTypes}
+                signageTypesLoading={signageTypesLoading}
+                subTypesByParent={subTypesByParent}
+                subTypesLoading={subTypesLoading}
+                onCreateSignageType={createSignageType}
+                onDeleteSignageType={deleteSignageType}
+                onCreateSubType={createSubType}
+                onDeleteSubType={deleteSubType}
+                onUpdateSignageTypeColor={updateSignageTypeColor}
+                onUpdateSubTypeColor={updateSubTypeColor}
+              />
+            )}
 
-        <LayersPanel
-          annotations={annotations}
-          selectedAnnotation={selectedAnnotation}
-          onUpdateAnnotation={handleUpdateAnnotation}
-          signageTypes={signageTypes}
-          onUpdateSignageTypeNotes={updateSignageTypeNotes}
-        />
+            {isLoading ? (
+              <div className="flex-1 flex items-center justify-center canvas-grid">
+                <div className="flex flex-col items-center gap-4">
+                  <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+                  <p className="text-sm text-muted-foreground">Loading...</p>
+                </div>
+              </div>
+            ) : activeEvent && activeLayout ? (
+              <Canvas
+                image={imageUrl}
+                onImageUpload={handleImageUpload}
+                annotations={annotations}
+                onAddAnnotation={handleAddAnnotation}
+                onDeleteAnnotation={handleDeleteAnnotation}
+                onUpdateAnnotation={handleUpdateAnnotation}
+              />
+            ) : (
+              <div className="flex-1 flex items-center justify-center canvas-grid">
+                <div className="text-center">
+                  <div className="w-16 h-16 rounded-full bg-secondary mx-auto mb-4 flex items-center justify-center">
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      className="w-8 h-8 text-muted-foreground"
+                    >
+                      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                      <polyline points="9 22 9 12 15 12 15 22" />
+                    </svg>
+                  </div>
+                  <p className="text-lg font-medium text-muted-foreground">
+                    Select or create an event
+                  </p>
+                  <p className="text-sm text-muted-foreground/70 mt-1">
+                    Use the Events panel on the left to get started
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <LayersPanel
+              annotations={annotations}
+              selectedAnnotation={selectedAnnotation}
+              onUpdateAnnotation={handleUpdateAnnotation}
+              signageTypes={signageTypes}
+              onUpdateSignageTypeNotes={updateSignageTypeNotes}
+            />
+          </>
+        )}
       </div>
     </div>
   );

@@ -57,6 +57,8 @@ export interface Annotation {
   direction?: SignDirection;
   // Annotation-specific notes
   notes?: string;
+  // Asset tracking - order status for signage annotations
+  orderStatus?: OrderStatus;
 }
 
 export interface LayerVisibility {
@@ -71,7 +73,17 @@ export interface SubLayerVisibility {
   flow: Record<FlowType, boolean>;
 }
 
-export type EditorMode = 'edit' | 'view';
+export type EditorMode = 'edit' | 'view' | 'assets';
+
+// Asset tracking
+export type OrderStatus = 'not_ordered' | 'ordered' | 'shipped' | 'installed';
+
+export const ORDER_STATUSES: Record<OrderStatus, { label: string }> = {
+  not_ordered: { label: 'Not Ordered' },
+  ordered: { label: 'Ordered' },
+  shipped: { label: 'Shipped' },
+  installed: { label: 'Installed' },
+};
 
 // Helper to determine if an annotation type uses lines or markers
 export const isLineAnnotation = (category: AnnotationCategory, type: AnnotationType): boolean => {

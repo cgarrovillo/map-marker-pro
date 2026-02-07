@@ -5,6 +5,7 @@ import type { Annotation, SignageType, BarrierType, FlowType } from '@/types/ann
 // UI Selectors
 export const selectMode = (state: RootState) => state.ui.mode;
 export const selectIsEditMode = (state: RootState) => state.ui.mode === 'edit';
+export const selectIsAssetsMode = (state: RootState) => state.ui.mode === 'assets';
 export const selectSelectedCategory = (state: RootState) => state.ui.selectedCategory;
 export const selectSelectedType = (state: RootState) => state.ui.selectedType;
 export const selectSelectedSignageTypeId = (state: RootState) => state.ui.selectedSignageTypeId;
