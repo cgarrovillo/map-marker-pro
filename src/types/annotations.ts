@@ -18,7 +18,15 @@ export type SignDirection =
   | 'up-left' 
   | 'up-right' 
   | 'down-left' 
-  | 'down-right';
+  | 'down-right'
+  | 'up-then-right'
+  | 'up-then-left'
+  | 'right-then-up'
+  | 'right-then-down'
+  | 'down-then-right'
+  | 'down-then-left'
+  | 'left-then-up'
+  | 'left-then-down';
 
 export type SignHolderType = 'sign-pedestal-1' | 'sign-pedestal-2';
 
@@ -165,8 +173,11 @@ export const FLOW_TYPES: Record<FlowType, { label: string; icon: string }> = {
   egress: { label: 'Egress / Emergency', icon: 'LogOut' },
 };
 
-// Sign direction configuration with rotation degrees for arrow display
-export const SIGN_DIRECTIONS: Record<SignDirection, { label: string; rotation: number }> = {
+// Sign direction configuration with rotation degrees for arrow display.
+// Simple directions use `rotation` to rotate a single up-arrow icon.
+// Compound ("then") directions provide a custom `svgPath` (12x12 viewBox)
+// that draws an elbow arrow: first arm → bend → second arm → chevron.
+export const SIGN_DIRECTIONS: Record<SignDirection, { label: string; rotation: number; svgPath?: string }> = {
   'up': { label: 'Up', rotation: 0 },
   'up-right': { label: 'Up-Right', rotation: 45 },
   'right': { label: 'Right', rotation: 90 },
@@ -175,6 +186,24 @@ export const SIGN_DIRECTIONS: Record<SignDirection, { label: string; rotation: n
   'down-left': { label: 'Down-Left', rotation: 225 },
   'left': { label: 'Left', rotation: 270 },
   'up-left': { label: 'Up-Left', rotation: 315 },
+  // Compound directions — L-shaped elbow arrow with chevron.
+  // First arm = 4 units, second arm = 6 units (1.5x), chevron wings = 2 units.
+  'up-then-right': { label: 'Up then Right', rotation: 0, svgPath: 'M3 10 V6 H9 M7 4 L9 6 L7 8' },
+  'up-then-left':  { label: 'Up then Left',  rotation: 0, svgPath: 'M9 10 V6 H3 M5 4 L3 6 L5 8' },
+  'right-then-up':   { label: 'Right then Up',   rotation: 90, svgPath: 'M2 9 H6 V3 M4 5 L6 3 L8 5' },
+  'right-then-down': { label: 'Right then Down', rotation: 90, svgPath: 'M2 3 H6 V9 M4 7 L6 9 L8 7' },
+  'down-then-right': { label: 'Down then Right', rotation: 180, svgPath: 'M3 2 V6 H9 M7 4 L9 6 L7 8' },
+  'down-then-left':  { label: 'Down then Left',  rotation: 180, svgPath: 'M9 2 V6 H3 M5 4 L3 6 L5 8' },
+  'left-then-up':   { label: 'Left then Up',   rotation: 270, svgPath: 'M10 9 H6 V3 M4 5 L6 3 L8 5' },
+  'left-then-down': { label: 'Left then Down', rotation: 270, svgPath: 'M10 3 H6 V9 M4 7 L6 9 L8 7' },
+};
+
+// Maps each cardinal direction to its compound sub-options (shown on hover)
+export const COMPOUND_DIRECTIONS: Partial<Record<SignDirection, SignDirection[]>> = {
+  'up': ['up-then-left', 'up-then-right'],
+  'right': ['right-then-up', 'right-then-down'],
+  'down': ['down-then-left', 'down-then-right'],
+  'left': ['left-then-up', 'left-then-down'],
 };
 
 // Sign holder configuration with number of sides

@@ -21,6 +21,7 @@ import {
   SIGN_HOLDERS,
   DEFAULT_SIGN_HOLDER,
   WASHROOM_SUB_TYPES,
+  COMPOUND_DIRECTIONS,
 } from '@/types/annotations';
 import { cn } from '@/lib/utils';
 import { Tables } from '@/integrations/supabase/types';
@@ -226,6 +227,78 @@ function DirectionButton({
   );
 }
 
+function CompoundDirectionButton({
+  direction,
+  isSelected,
+  onClick,
+}: {
+  direction: SignDirection;
+  isSelected: boolean;
+  onClick: () => void;
+}) {
+  const config = SIGN_DIRECTIONS[direction];
+
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
+      className={cn(
+        'w-8 h-8 rounded flex items-center justify-center transition-colors',
+        'hover:bg-secondary border border-transparent',
+        isSelected && 'bg-primary text-primary-foreground border-primary hover:bg-primary/90'
+      )}
+      title={config.label}
+    >
+      <svg
+        className="w-4 h-4"
+        viewBox="0 0 12 12"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <path
+          d={config.svgPath ?? ''}
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    </button>
+  );
+}
+
+function getCompoundPopoverPosition(
+  direction: SignDirection,
+): { style: React.CSSProperties; flexDirection: 'row' | 'column' } {
+  switch (direction) {
+    case 'up':
+      return {
+        style: { bottom: '100%', left: '50%', transform: 'translateX(-50%)', paddingBottom: 4 },
+        flexDirection: 'row',
+      };
+    case 'down':
+      return {
+        style: { top: '100%', left: '50%', transform: 'translateX(-50%)', paddingTop: 4 },
+        flexDirection: 'row',
+      };
+    case 'left':
+      return {
+        style: { right: '100%', top: '50%', transform: 'translateY(-50%)', paddingRight: 4 },
+        flexDirection: 'column',
+      };
+    case 'right':
+      return {
+        style: { left: '100%', top: '50%', transform: 'translateY(-50%)', paddingLeft: 4 },
+        flexDirection: 'column',
+      };
+    default:
+      return { style: {}, flexDirection: 'row' };
+  }
+}
+
 function DirectionSelector({
   value,
   onChange,
@@ -248,7 +321,9 @@ function DirectionSelector({
         const direction = dir as SignDirection;
         // Skip center cell (row 1, col 1)
         if (pos.row === 1 && pos.col === 1) return null;
-        
+
+        const compounds = COMPOUND_DIRECTIONS[direction];
+
         return (
           <div
             key={direction}
@@ -257,11 +332,52 @@ function DirectionSelector({
               gridColumn: pos.col + 1,
             }}
           >
-            <DirectionButton
-              direction={direction}
-              isSelected={value === direction}
-              onClick={() => handleClick(direction)}
-            />
+            {compounds ? (
+              // Cardinal direction with compound sub-options on hover
+              <div className="relative group/compound">
+                <DirectionButton
+                  direction={direction}
+                  isSelected={
+                    value === direction ||
+                    compounds.includes(value as SignDirection)
+                  }
+                  onClick={() => handleClick(direction)}
+                />
+                {/* Compound popover — padding on the button-facing side acts as an
+                    invisible hover bridge so the mouse can travel from button to popover. */}
+                {(() => {
+                  const { style: popoverStyle, flexDirection } =
+                    getCompoundPopoverPosition(direction);
+                  return (
+                    <div
+                      className="absolute z-10 hidden group-hover/compound:block"
+                      style={popoverStyle}
+                    >
+                      <div
+                        className="flex gap-1 bg-popover border rounded-md p-1 shadow-md"
+                        style={{ flexDirection }}
+                      >
+                        {compounds.map((compDir) => (
+                          <CompoundDirectionButton
+                            key={compDir}
+                            direction={compDir}
+                            isSelected={value === compDir}
+                            onClick={() => handleClick(compDir)}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            ) : (
+              // Diagonal direction — no compound sub-options
+              <DirectionButton
+                direction={direction}
+                isSelected={value === direction}
+                onClick={() => handleClick(direction)}
+              />
+            )}
           </div>
         );
       })}

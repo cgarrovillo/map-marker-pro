@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useMemo } from 'react';
 import { AnnotationPanel } from './AnnotationPanel';
 import { LayersPanel } from './LayersPanel';
@@ -13,7 +13,7 @@ import { useAuthContext } from '@/components/auth/AuthProvider';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { LogOut, Building2, Eye, Edit3, Download, Upload, RotateCcw, Package } from 'lucide-react';
+import { LogOut, Building2, Eye, Edit3, Download, Upload, RotateCcw, Package, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAppSelector, useAppDispatch } from '@/store/hooks';
 import { selectMode, selectIsAssetsMode, selectSelectedCategory, selectSelectedType, selectSelectedAnnotationId, selectSelectedSignageTypeId, selectSelectedSignageSubTypeId } from '@/store/selectors';
@@ -25,6 +25,7 @@ export function FloorPlanEditor() {
   const dispatch = useAppDispatch();
   const { signOut } = useAuthContext();
   const { organization, currentUser } = useOrganization();
+  const replaceImageInputRef = useRef<HTMLInputElement>(null);
 
   // Redux state
   const mode = useAppSelector(selectMode);
@@ -233,6 +234,28 @@ export function FloorPlanEditor() {
     }
   }, [activeLayoutId, activeLayout, clearAnnotations, getAnnotations]);
 
+  const handleReplaceImage = useCallback(() => {
+    if (!activeLayoutId) {
+      toast.error('Please select or create an event first');
+      return;
+    }
+    if (confirm('Are you sure you want to replace the current floor plan image? This will not remove existing annotations.')) {
+      replaceImageInputRef.current?.click();
+    }
+  }, [activeLayoutId]);
+
+  const handleReplaceImageFileChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file) {
+        handleImageUpload(file);
+      }
+      // Reset the input so the same file can be re-selected
+      e.target.value = '';
+    },
+    [handleImageUpload]
+  );
+
   const handleCreateEvent = useCallback(
     async (name: string) => {
       try {
@@ -418,6 +441,21 @@ export function FloorPlanEditor() {
             </TooltipTrigger>
             <TooltipContent>Clear all annotations</TooltipContent>
           </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" onClick={handleReplaceImage}>
+                <RefreshCw className="w-4 h-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Replace floor plan image</TooltipContent>
+          </Tooltip>
+          <input
+            ref={replaceImageInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleReplaceImageFileChange}
+          />
 
           <div className="w-px h-6 bg-border mx-1" />
 

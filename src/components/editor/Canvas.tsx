@@ -1,5 +1,5 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
-import { Upload, Image as ImageIcon, RefreshCw, ZoomIn, ZoomOut, Maximize } from 'lucide-react';
+import { Upload, Image as ImageIcon, ZoomIn, ZoomOut, Maximize, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Slider } from '@/components/ui/slider';
@@ -625,9 +625,6 @@ export function Canvas({
       onMouseMove={handleCanvasMouseMove}
       onMouseUp={handleCanvasMouseUp}
       onClick={handleCanvasClick}
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      onDrop={handleDrop}
       style={{ cursor: getCursor() }}
     >
       {/* Zoom Controls */}
@@ -697,41 +694,19 @@ export function Canvas({
         </Tooltip>
       </div>
 
-      {/* Replace image button */}
+      {/* Direction info note */}
       <div
         className="absolute top-3 right-3 z-10"
         onClick={(e) => e.stopPropagation()}
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <label>
-              <input
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={handleFileInput}
-              />
-              <Button variant="secondary" size="sm" className="cursor-pointer" asChild>
-                <span>
-                  <RefreshCw className="w-4 h-4 mr-2" />
-                  Replace Image
-                </span>
-              </Button>
-            </label>
-          </TooltipTrigger>
-          <TooltipContent>Upload a new floor plan image</TooltipContent>
-        </Tooltip>
-      </div>
-
-      {isDragging && (
-        <div className="absolute inset-0 z-30 bg-primary/10 backdrop-blur-sm flex items-center justify-center border-2 border-dashed border-primary">
-          <div className="text-center">
-            <ImageIcon className="w-12 h-12 mx-auto mb-2 text-primary" />
-            <p className="text-lg font-medium text-primary">Drop to replace floor plan</p>
-          </div>
+        <div className="flex items-center gap-1.5 bg-card/95 backdrop-blur-sm rounded-lg px-3 py-2 shadow-lg border border-border max-w-[240px]">
+          <Info className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+          <p className="text-xs text-muted-foreground leading-tight">
+            Directions are based on facing the sign, not map orientation.
+          </p>
         </div>
-      )}
+      </div>
 
       {/* Transformable Canvas Container */}
       <div
@@ -911,33 +886,53 @@ export function Canvas({
                     // Helper to render a label with direction arrow, using per-side label/color
                     const renderLabel = (sideData: SignSide | undefined, fallbackLabel: string) => {
                       const direction = sideData?.direction;
-                      const directionRotation = direction ? SIGN_DIRECTIONS[direction].rotation : 0;
+                      const dirConfig = direction ? SIGN_DIRECTIONS[direction] : undefined;
                       const sideLabel = getSideLabel(sideData) || fallbackLabel;
                       const sideBgColor = getSideColor(sideData, color, signageTypes, subTypesByParent);
-                      
+
                       return (
                         <div
                           className="whitespace-nowrap flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium"
                           style={{ backgroundColor: sideBgColor, color: 'white' }}
                         >
                           {sideLabel}
-                          {direction && (
-                            <svg
-                              width="12"
-                              height="12"
-                              viewBox="0 0 12 12"
-                              fill="none"
-                              xmlns="http://www.w3.org/2000/svg"
-                              style={{ transform: `rotate(${directionRotation}deg)` }}
-                            >
-                              <path
-                                d="M6 2L6 10M6 2L3 5M6 2L9 5"
-                                stroke="white"
-                                strokeWidth="1.5"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                              />
-                            </svg>
+                          {dirConfig && (
+                            dirConfig.svgPath ? (
+                              // Compound direction — elbow arrow with chevron
+                              <svg
+                                width="14"
+                                height="14"
+                                viewBox="0 0 12 12"
+                                fill="none"
+                                xmlns="http://www.w3.org/2000/svg"
+                              >
+                                <path
+                                  d={dirConfig.svgPath}
+                                  stroke="white"
+                                  strokeWidth="1.5"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                />
+                              </svg>
+                            ) : (
+                              // Simple direction — rotated straight arrow
+                              <svg
+                                width="12"
+                                height="12"
+                                viewBox="0 0 12 12"
+                                fill="none"
+                                xmlns="http://www.w3.org/2000/svg"
+                                style={{ transform: `rotate(${dirConfig.rotation}deg)` }}
+                              >
+                                <path
+                                  d="M6 2L6 10M6 2L3 5M6 2L9 5"
+                                  stroke="white"
+                                  strokeWidth="1.5"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                />
+                              </svg>
+                            )
                           )}
                         </div>
                       );
