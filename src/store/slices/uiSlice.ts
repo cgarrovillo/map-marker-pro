@@ -110,14 +110,27 @@ const uiSlice = createSlice({
       state.pendingLine = null;
     },
     setSelectedSignageTypeId: (state, action: PayloadAction<string | null>) => {
-      state.selectedSignageTypeId = action.payload;
-      // Clear sub-type selection when changing parent type
-      state.selectedSignageSubTypeId = null;
-      // When selecting a signage type, set category to signage and type to ticket
       if (action.payload) {
+        // Toggle off if re-selecting the same parent type (with no sub-type active)
+        if (
+          state.selectedSignageTypeId === action.payload &&
+          !state.selectedSignageSubTypeId
+        ) {
+          state.selectedType = null;
+          state.selectedSignageTypeId = null;
+          state.selectedSignageSubTypeId = null;
+          state.selectedWashroomSubType = null;
+          return;
+        }
+        state.selectedSignageTypeId = action.payload;
+        // Clear sub-type selection when changing parent type
+        state.selectedSignageSubTypeId = null;
         state.selectedCategory = 'signage';
         state.selectedType = 'ticket';
         state.selectedWashroomSubType = null;
+      } else {
+        state.selectedSignageTypeId = null;
+        state.selectedSignageSubTypeId = null;
       }
     },
     setSelectedSignageSubTypeId: (

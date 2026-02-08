@@ -92,6 +92,8 @@ interface AnnotationPanelProps {
   onUpdateSubTypeColor: (signageTypeId: string, subTypeId: string, color: string) => Promise<void>;
   onRenameSignageType: (id: string, newName: string) => Promise<void>;
   onUpdateSignageTypeNotes: (id: string, notes: string | null) => Promise<void>;
+  onUpdateSignageTypeImage: (id: string, imageUrl: string | null) => Promise<void>;
+  onUpdateSubTypeImage: (signageTypeId: string, subTypeId: string, imageUrl: string | null) => Promise<void>;
   onRenameSubType: (signageTypeId: string, subTypeId: string, newName: string) => Promise<void>;
 }
 
@@ -345,6 +347,7 @@ function SignageTypeAccordionItem({
   selectedSignageTypeId,
   selectedSignageSubTypeId,
   isEditMode,
+  onSelectType,
   onSelectSubType,
   onAddSubType,
   onDeleteSubType,
@@ -359,6 +362,7 @@ function SignageTypeAccordionItem({
   selectedSignageTypeId: string | null;
   selectedSignageSubTypeId: string | null;
   isEditMode: boolean;
+  onSelectType: (signageTypeId: string) => void;
   onSelectSubType: (signageTypeId: string, subTypeId: string) => void;
   onAddSubType: (signageTypeId: string, name: string) => void;
   onDeleteSubType: (signageTypeId: string, subTypeId: string) => void;
@@ -372,8 +376,10 @@ function SignageTypeAccordionItem({
   const [isAddingSubType, setIsAddingSubType] = useState(false);
   const [showActions, setShowActions] = useState(false);
 
-  // Check if this parent type is selected (via one of its sub-types)
-  const isParentSelected = selectedSignageTypeId === signageType.id;
+  // Directly selected as the active placement tool (parent only, no sub-type)
+  const isDirectlySelected = selectedSignageTypeId === signageType.id && !selectedSignageSubTypeId;
+  // Highlighted because a child sub-type is selected
+  const isChildSelected = selectedSignageTypeId === signageType.id && !!selectedSignageSubTypeId;
   const color = getSignageColor(signageType);
   const emoji = getSignageEmoji(signageType.icon);
 
@@ -391,12 +397,20 @@ function SignageTypeAccordionItem({
       {/* Signage Type Header */}
       <div className="relative">
         <button
-          onClick={() => setIsExpanded(!isExpanded)}
+          onClick={() => {
+            if (isEditMode) {
+              onSelectType(signageType.id);
+              // Auto-expand when selecting
+              if (!isExpanded) setIsExpanded(true);
+            }
+          }}
+          disabled={!isEditMode}
           className={cn(
             'w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all',
             isEditMode && 'hover:bg-secondary cursor-pointer',
             !isEditMode && 'opacity-60 cursor-default',
-            isParentSelected && 'bg-secondary/50'
+            isDirectlySelected && 'bg-secondary ring-1 ring-primary',
+            isChildSelected && 'bg-secondary/50'
           )}
         >
           {/* Color picker for signage type */}
@@ -421,7 +435,7 @@ function SignageTypeAccordionItem({
           >
             <span className="text-sm leading-none">{emoji}</span>
           </div>
-          <span className={cn('flex-1 text-left', isParentSelected && 'text-foreground font-medium')}>
+          <span className={cn('flex-1 text-left', (isDirectlySelected || isChildSelected) && 'text-foreground font-medium')}>
             {signageType.name}
           </span>
           {/* Show actions on hover, count otherwise */}
@@ -453,11 +467,19 @@ function SignageTypeAccordionItem({
               {subTypes.length}
             </span>
           )}
-          {isExpanded ? (
-            <ChevronDown className="w-4 h-4 text-muted-foreground" />
-          ) : (
-            <ChevronRight className="w-4 h-4 text-muted-foreground" />
-          )}
+          <span
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsExpanded(!isExpanded);
+            }}
+            className="p-0.5 rounded hover:bg-secondary/80 transition-colors"
+          >
+            {isExpanded ? (
+              <ChevronDown className="w-4 h-4 text-muted-foreground" />
+            ) : (
+              <ChevronRight className="w-4 h-4 text-muted-foreground" />
+            )}
+          </span>
         </button>
       </div>
 
@@ -522,6 +544,7 @@ function SignagesSection({
   selectedSignageTypeId,
   selectedSignageSubTypeId,
   isEditMode,
+  onSelectType,
   onSelectSubType,
   onAddSignageType,
   onDeleteSignageType,
@@ -539,6 +562,7 @@ function SignagesSection({
   selectedSignageTypeId: string | null;
   selectedSignageSubTypeId: string | null;
   isEditMode: boolean;
+  onSelectType: (signageTypeId: string) => void;
   onSelectSubType: (signageTypeId: string, subTypeId: string) => void;
   onAddSignageType: (data: { name: string; icon?: string; color?: string; autoSubTypes?: string[] }) => void;
   onDeleteSignageType: (id: string) => void;
@@ -591,6 +615,7 @@ function SignagesSection({
                 selectedSignageTypeId={selectedSignageTypeId}
                 selectedSignageSubTypeId={selectedSignageSubTypeId}
                 isEditMode={isEditMode}
+                onSelectType={onSelectType}
                 onSelectSubType={onSelectSubType}
                 onAddSubType={onAddSubType}
                 onDeleteSubType={onDeleteSubType}
@@ -644,6 +669,8 @@ export function AnnotationPanel({
   onUpdateSubTypeColor,
   onRenameSignageType,
   onUpdateSignageTypeNotes,
+  onUpdateSignageTypeImage,
+  onUpdateSubTypeImage,
   onRenameSubType,
 }: AnnotationPanelProps) {
   const dispatch = useAppDispatch();
@@ -659,6 +686,10 @@ export function AnnotationPanel({
 
   const handleSelect = (category: AnnotationCategory, type: AnnotationType) => {
     dispatch(selectAnnotationType({ category, type }));
+  };
+
+  const handleSelectType = (signageTypeId: string) => {
+    dispatch(setSelectedSignageTypeId(signageTypeId));
   };
 
   const handleSelectSubType = (signageTypeId: string, subTypeId: string) => {
@@ -751,6 +782,7 @@ export function AnnotationPanel({
           selectedSignageTypeId={selectedSignageTypeId}
           selectedSignageSubTypeId={selectedSignageSubTypeId}
           isEditMode={isEditMode}
+          onSelectType={handleSelectType}
           onSelectSubType={handleSelectSubType}
           onAddSignageType={handleAddSignageType}
           onDeleteSignageType={handleDeleteSignageType}
@@ -818,6 +850,7 @@ export function AnnotationPanel({
         onUpdateNotes={onUpdateSignageTypeNotes}
         onUpdateColor={onUpdateSignageTypeColor}
         onUpdateIcon={onUpdateSignageTypeIcon}
+        onUpdateImage={onUpdateSignageTypeImage}
         annotationCount={
           editingType
             ? annotations.filter((a) => a.category === 'signage' && a.signageTypeName === editingType.name).length
@@ -833,6 +866,7 @@ export function AnnotationPanel({
         onOpenChange={(open) => { if (!open) setEditingSubType(null); }}
         onRename={onRenameSubType}
         onUpdateColor={onUpdateSubTypeColor}
+        onUpdateImage={onUpdateSubTypeImage}
         annotationCount={
           editingSubType
             ? annotations.filter(

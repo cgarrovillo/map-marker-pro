@@ -204,11 +204,16 @@ export function useVenueLayouts(eventId: string | null) {
         points,
         label,
         createdAt: Date.now(),
-        // Set default sign holder for signage annotations
-        ...(category === 'signage' && { signHolder: DEFAULT_SIGN_HOLDER }),
-        // Include signageTypeName for parent signage type
+        // Set default sign holder and seed side1 type for signage annotations
+        ...(category === 'signage' && {
+          signHolder: DEFAULT_SIGN_HOLDER,
+          side1: {
+            ...(signageTypeName && { signageTypeName }),
+            ...(signageSubTypeName && { signageSubTypeName }),
+          },
+        }),
+        // Keep root-level type fields for backwards compat (synced to side 1)
         ...(signageTypeName && { signageTypeName }),
-        // Include signageSubTypeName for the specific sub-type
         ...(signageSubTypeName && { signageSubTypeName }),
       };
 

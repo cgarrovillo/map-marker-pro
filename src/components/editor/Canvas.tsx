@@ -76,6 +76,27 @@ const DEFAULT_TYPE_COLORS: Record<string, string> = {
 };
 
 /**
+ * Resolve color from a signageTypeName / signageSubTypeName pair using live data.
+ * Returns undefined if no matching color is found.
+ */
+const resolveSignageColor = (
+  signageTypeName: string | undefined,
+  signageSubTypeName: string | undefined,
+  signageTypes?: SignageType[],
+  subTypesByParent?: Record<string, SignageSubType[]>,
+): string | undefined => {
+  if (!signageTypeName || !signageTypes) return undefined;
+  const matchingType = signageTypes.find(t => t.name === signageTypeName);
+  if (!matchingType) return undefined;
+  if (signageSubTypeName && subTypesByParent) {
+    const subTypes = subTypesByParent[matchingType.id] || [];
+    const matchingSubType = subTypes.find(st => st.name === signageSubTypeName);
+    if (matchingSubType?.color) return matchingSubType.color;
+  }
+  return matchingType.color || undefined;
+};
+
+/**
  * Resolve annotation color dynamically from live signage types data.
  * Priority: sub-type color > parent type color > stored annotation.color > hardcoded default
  */
@@ -86,19 +107,14 @@ const getTypeColor = (
   signageTypes?: SignageType[],
   subTypesByParent?: Record<string, SignageSubType[]>,
 ): string => {
-  // For signage annotations, resolve color from live signage types data
-  if (annotation && category === 'signage' && signageTypes && annotation.signageTypeName) {
-    const matchingType = signageTypes.find(t => t.name === annotation.signageTypeName);
-    if (matchingType) {
-      // Sub-type color takes priority
-      if (annotation.signageSubTypeName && subTypesByParent) {
-        const subTypes = subTypesByParent[matchingType.id] || [];
-        const matchingSubType = subTypes.find(st => st.name === annotation.signageSubTypeName);
-        if (matchingSubType?.color) return matchingSubType.color;
-      }
-      // Parent type color
-      if (matchingType.color) return matchingType.color;
-    }
+  if (annotation && category === 'signage' && signageTypes) {
+    const color = resolveSignageColor(
+      annotation.signageTypeName,
+      annotation.signageSubTypeName,
+      signageTypes,
+      subTypesByParent,
+    );
+    if (color) return color;
   }
 
   // Fallback: stored annotation color (for deleted types or non-signage)
@@ -106,6 +122,38 @@ const getTypeColor = (
 
   // Fallback: hardcoded defaults
   return DEFAULT_TYPE_COLORS[`${category}-${type}`] || 'hsl(185, 75%, 55%)';
+};
+
+/**
+ * Resolve color for a specific side's type, falling back to the annotation-level color.
+ */
+const getSideColor = (
+  sideData: SignSide | undefined,
+  fallbackColor: string,
+  signageTypes?: SignageType[],
+  subTypesByParent?: Record<string, SignageSubType[]>,
+): string => {
+  if (sideData?.signageTypeName) {
+    const color = resolveSignageColor(
+      sideData.signageTypeName,
+      sideData.signageSubTypeName,
+      signageTypes,
+      subTypesByParent,
+    );
+    if (color) return color;
+  }
+  return fallbackColor;
+};
+
+/**
+ * Build a display label from a side's type fields.
+ */
+const getSideLabel = (sideData: SignSide | undefined): string | undefined => {
+  if (!sideData?.signageTypeName) return undefined;
+  if (sideData.signageSubTypeName) {
+    return `${sideData.signageTypeName} - ${sideData.signageSubTypeName}`;
+  }
+  return sideData.signageTypeName;
 };
 
 const getTypeLabel = (category: AnnotationCategory, type: AnnotationType, annotation?: Annotation): string => {
@@ -835,30 +883,42 @@ export function Canvas({
                     const holderConfig = SIGN_HOLDERS[currentHolder];
                     const isTwoSided = holderConfig?.sides === 2;
 
-                    // Get side data with backwards compatibility
-                    const getSideData = (side: 1 | 2): SignSide | undefined => {
+                    // Get side data with backwards compatibility (including type fields)
+                    const getCanvasSideData = (side: 1 | 2): SignSide | undefined => {
                       if (side === 1) {
-                        if (annotation.side1) return annotation.side1;
-                        if (annotation.imageUrl || annotation.direction) {
-                          return { imageUrl: annotation.imageUrl, direction: annotation.direction };
+                        if (annotation.side1) {
+                          return {
+                            ...annotation.side1,
+                            signageTypeName: annotation.side1.signageTypeName ?? annotation.signageTypeName,
+                            signageSubTypeName: annotation.side1.signageSubTypeName ?? annotation.signageSubTypeName,
+                          };
+                        }
+                        if (annotation.direction || annotation.signageTypeName) {
+                          return {
+                            direction: annotation.direction,
+                            signageTypeName: annotation.signageTypeName,
+                            signageSubTypeName: annotation.signageSubTypeName,
+                          };
                         }
                         return undefined;
                       }
                       return annotation.side2;
                     };
 
-                    const side1Data = getSideData(1);
-                    const side2Data = getSideData(2);
+                    const side1Data = getCanvasSideData(1);
+                    const side2Data = getCanvasSideData(2);
 
-                    // Helper to render a label with direction arrow
-                    const renderLabel = (sideData: SignSide | undefined, sideLabel: string) => {
+                    // Helper to render a label with direction arrow, using per-side label/color
+                    const renderLabel = (sideData: SignSide | undefined, fallbackLabel: string) => {
                       const direction = sideData?.direction;
                       const directionRotation = direction ? SIGN_DIRECTIONS[direction].rotation : 0;
+                      const sideLabel = getSideLabel(sideData) || fallbackLabel;
+                      const sideBgColor = getSideColor(sideData, color, signageTypes, subTypesByParent);
                       
                       return (
                         <div
                           className="whitespace-nowrap flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium"
-                          style={{ backgroundColor: color, color: 'white' }}
+                          style={{ backgroundColor: sideBgColor, color: 'white' }}
                         >
                           {sideLabel}
                           {direction && (
@@ -921,7 +981,16 @@ export function Canvas({
                           {/* Labels - stacked for 2-sided signs */}
                           <div className="absolute left-1/2 -translate-x-1/2 top-6 flex flex-col items-center gap-1">
                             {renderLabel(side1Data, label)}
-                            {isTwoSided && renderLabel(side2Data, label)}
+                            {isTwoSided && side2Data?.signageTypeName
+                              ? renderLabel(side2Data, getSideLabel(side2Data) || label)
+                              : isTwoSided && (
+                                <div
+                                  className="whitespace-nowrap px-2 py-0.5 rounded text-xs font-medium italic opacity-60"
+                                  style={{ backgroundColor: color, color: 'white' }}
+                                >
+                                  No type
+                                </div>
+                              )}
                           </div>
                         </div>
                       </div>

@@ -227,6 +227,35 @@ export function useSignageSubTypes(venueLayoutId: string | null, signageTypeIds:
     [subTypesByParent]
   );
 
+  const updateSubTypeImage = useCallback(
+    async (signageTypeId: string, subTypeId: string, imageUrl: string | null) => {
+      // Optimistic update
+      const previousSubTypes = subTypesByParent[signageTypeId] || [];
+      setSubTypesByParent((prev) => ({
+        ...prev,
+        [signageTypeId]: (prev[signageTypeId] || []).map((t) =>
+          t.id === subTypeId ? { ...t, image_url: imageUrl } : t
+        ),
+      }));
+
+      const { error } = await supabase
+        .from('signage_sub_types')
+        .update({ image_url: imageUrl })
+        .eq('id', subTypeId);
+
+      if (error) {
+        console.error('Error updating signage sub-type image:', error);
+        // Revert on error
+        setSubTypesByParent((prev) => ({
+          ...prev,
+          [signageTypeId]: previousSubTypes,
+        }));
+        throw error;
+      }
+    },
+    [subTypesByParent]
+  );
+
   // Helper to get sub-types for a specific parent
   const getSubTypesForParent = useCallback(
     (signageTypeId: string): SignageSubType[] => {
@@ -242,6 +271,7 @@ export function useSignageSubTypes(venueLayoutId: string | null, signageTypeIds:
     deleteSubType,
     renameSubType,
     updateSubTypeColor,
+    updateSubTypeImage,
     getSubTypesForParent,
   };
 }

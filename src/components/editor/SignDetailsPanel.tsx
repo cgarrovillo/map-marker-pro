@@ -1,6 +1,5 @@
-import { useRef, useState, useEffect } from 'react';
-import { Upload, X, ArrowUp, ImageIcon, Info } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { useState, useEffect } from 'react';
+import { ArrowUp, Info } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -23,12 +22,17 @@ import {
   DEFAULT_SIGN_HOLDER,
   WASHROOM_SUB_TYPES,
 } from '@/types/annotations';
-import { useSignImageUpload } from '@/hooks/useSignImageUpload';
 import { cn } from '@/lib/utils';
+import { Tables } from '@/integrations/supabase/types';
+
+type SignageTypeRow = Tables<'signage_types'>;
+type SignageSubTypeRow = Tables<'signage_sub_types'>;
 
 interface SignDetailsPanelProps {
   annotation: Annotation;
   onUpdate: (updates: Partial<Annotation>) => void;
+  signageTypes?: SignageTypeRow[];
+  subTypesByParent?: Record<string, SignageSubTypeRow[]>;
 }
 
 // Direction button positions in a 3x3 grid compass layout
@@ -123,110 +127,92 @@ function DirectionSelector({
   );
 }
 
-function ImageSection({
-  imageUrl,
-  uploading,
-  onUpload,
-  onRemove,
-}: {
-  imageUrl: string | undefined;
-  uploading: boolean;
-  onUpload: (file: File) => void;
-  onRemove: () => void;
-}) {
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      onUpload(file);
-    }
-    // Reset input so same file can be selected again
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
-  };
-
-  return (
-    <div className="space-y-2">
-      <Label className="text-xs text-muted-foreground">Sign Image</Label>
-      
-      {imageUrl ? (
-        <div className="relative group">
-          <img
-            src={imageUrl}
-            alt="Sign preview"
-            className="w-full h-32 object-cover rounded-md border border-border"
-          />
-          <button
-            type="button"
-            onClick={onRemove}
-            className={cn(
-              'absolute top-2 right-2 p-1 rounded-full',
-              'bg-destructive text-destructive-foreground',
-              'opacity-0 group-hover:opacity-100 transition-opacity'
-            )}
-            title="Remove image"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-      ) : (
-        <div className="w-full h-32 rounded-md border border-dashed border-border flex flex-col items-center justify-center bg-muted/30">
-          <ImageIcon className="w-8 h-8 text-muted-foreground/50 mb-2" />
-          <span className="text-xs text-muted-foreground">No image</span>
-        </div>
-      )}
-
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/jpeg,image/png,image/gif,image/webp"
-        onChange={handleFileChange}
-        className="hidden"
-      />
-      
-      <Button
-        variant="outline"
-        size="sm"
-        className="w-full"
-        onClick={() => fileInputRef.current?.click()}
-        disabled={uploading}
-      >
-        <Upload className="w-4 h-4 mr-2" />
-        {uploading ? 'Uploading...' : imageUrl ? 'Change Image' : 'Upload Image'}
-      </Button>
-    </div>
-  );
-}
-
-// Side-specific details component (image + direction)
+// Side-specific details component (type selectors + direction)
 interface SideDetailsProps {
-  sideNumber: 1 | 2;
   sideData: SignSide | undefined;
-  annotationId: string;
-  uploading: boolean;
-  onImageUpload: (file: File) => void;
-  onImageRemove: () => void;
   onDirectionChange: (direction: SignDirection | undefined) => void;
+  signageTypes: SignageTypeRow[];
+  subTypesByParent: Record<string, SignageSubTypeRow[]>;
+  onTypeChange: (typeName: string | undefined, subTypeName: string | undefined) => void;
 }
 
 function SideDetails({
   sideData,
-  uploading,
-  onImageUpload,
-  onImageRemove,
   onDirectionChange,
+  signageTypes,
+  subTypesByParent,
+  onTypeChange,
 }: SideDetailsProps) {
+  // Resolve the currently-selected parent type row from the side's signageTypeName
+  const selectedParentType = sideData?.signageTypeName
+    ? signageTypes.find((t) => t.name === sideData.signageTypeName)
+    : undefined;
+
+  const availableSubTypes = selectedParentType
+    ? subTypesByParent[selectedParentType.id] || []
+    : [];
+
+  const handleParentTypeChange = (value: string) => {
+    if (value === '__none__') {
+      onTypeChange(undefined, undefined);
+    } else {
+      // When parent changes, reset sub-type
+      onTypeChange(value, undefined);
+    }
+  };
+
+  const handleSubTypeChange = (value: string) => {
+    if (value === '__none__') {
+      onTypeChange(sideData?.signageTypeName, undefined);
+    } else {
+      onTypeChange(sideData?.signageTypeName, value);
+    }
+  };
+
   return (
     <div className="space-y-4 pt-2">
-      {/* Image Section */}
-      <ImageSection
-        imageUrl={sideData?.imageUrl}
-        uploading={uploading}
-        onUpload={onImageUpload}
-        onRemove={onImageRemove}
-      />
+      {/* Signage Type Selectors */}
+      <div className="space-y-2">
+        <Label className="text-xs text-muted-foreground">Signage Type</Label>
+        <Select
+          value={sideData?.signageTypeName ?? '__none__'}
+          onValueChange={handleParentTypeChange}
+        >
+          <SelectTrigger className="w-full">
+            <SelectValue placeholder="Select type" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__none__">None</SelectItem>
+            {signageTypes.map((st) => (
+              <SelectItem key={st.id} value={st.name}>
+                {st.icon ? `${st.icon} ${st.name}` : st.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {availableSubTypes.length > 0 && (
+        <div className="space-y-2">
+          <Label className="text-xs text-muted-foreground">Sub-Type</Label>
+          <Select
+            value={sideData?.signageSubTypeName ?? '__none__'}
+            onValueChange={handleSubTypeChange}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Select sub-type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__none__">None</SelectItem>
+              {availableSubTypes.map((sst) => (
+                <SelectItem key={sst.id} value={sst.name}>
+                  {sst.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
 
       <Separator />
 
@@ -263,12 +249,20 @@ function SideDetails({
 // Helper to get side data with backwards compatibility
 function getSideData(annotation: Annotation, side: 1 | 2): SignSide | undefined {
   if (side === 1) {
-    // If side1 exists, use it; otherwise fall back to legacy fields
-    if (annotation.side1) return annotation.side1;
-    if (annotation.imageUrl || annotation.direction) {
+    if (annotation.side1) {
+      // side1 exists — fill in type fields from root-level if side1 doesn't carry its own yet
       return {
-        imageUrl: annotation.imageUrl,
+        ...annotation.side1,
+        signageTypeName: annotation.side1.signageTypeName ?? annotation.signageTypeName,
+        signageSubTypeName: annotation.side1.signageSubTypeName ?? annotation.signageSubTypeName,
+      };
+    }
+    // No side1 at all — fall back entirely to legacy root-level fields
+    if (annotation.direction || annotation.signageTypeName) {
+      return {
         direction: annotation.direction,
+        signageTypeName: annotation.signageTypeName,
+        signageSubTypeName: annotation.signageSubTypeName,
       };
     }
     return undefined;
@@ -276,8 +270,12 @@ function getSideData(annotation: Annotation, side: 1 | 2): SignSide | undefined 
   return annotation.side2;
 }
 
-export function SignDetailsPanel({ annotation, onUpdate }: SignDetailsPanelProps) {
-  const { uploading, uploadSignImage, deleteSignImage } = useSignImageUpload();
+export function SignDetailsPanel({
+  annotation,
+  onUpdate,
+  signageTypes = [],
+  subTypesByParent = {},
+}: SignDetailsPanelProps) {
   const [activeTab, setActiveTab] = useState<string>('side1');
   const [annotationNotes, setAnnotationNotes] = useState<string>(annotation.notes || '');
   
@@ -308,41 +306,6 @@ export function SignDetailsPanel({ annotation, onUpdate }: SignDetailsPanelProps
     }
   };
 
-  const handleSideImageUpload = async (side: 1 | 2, file: File) => {
-    const url = await uploadSignImage(annotation.id, side, file);
-    if (url) {
-      const sideKey = side === 1 ? 'side1' : 'side2';
-      const currentSideData = side === 1 ? side1Data : side2Data;
-      
-      // Delete old image if exists
-      if (currentSideData?.imageUrl) {
-        await deleteSignImage(currentSideData.imageUrl);
-      }
-      
-      onUpdate({
-        [sideKey]: {
-          ...currentSideData,
-          imageUrl: url,
-        },
-      });
-    }
-  };
-
-  const handleSideImageRemove = async (side: 1 | 2) => {
-    const sideKey = side === 1 ? 'side1' : 'side2';
-    const currentSideData = side === 1 ? side1Data : side2Data;
-    
-    if (currentSideData?.imageUrl) {
-      await deleteSignImage(currentSideData.imageUrl);
-      onUpdate({
-        [sideKey]: {
-          ...currentSideData,
-          imageUrl: undefined,
-        },
-      });
-    }
-  };
-
   const handleSideDirectionChange = (side: 1 | 2, direction: SignDirection | undefined) => {
     const sideKey = side === 1 ? 'side1' : 'side2';
     const currentSideData = side === 1 ? side1Data : side2Data;
@@ -353,6 +316,34 @@ export function SignDetailsPanel({ annotation, onUpdate }: SignDetailsPanelProps
         direction,
       },
     });
+  };
+
+  const handleSideTypeChange = (
+    side: 1 | 2,
+    signageTypeName: string | undefined,
+    signageSubTypeName: string | undefined,
+  ) => {
+    const sideKey = side === 1 ? 'side1' : 'side2';
+    const currentSideData = side === 1 ? side1Data : side2Data;
+
+    const sideUpdate = {
+      [sideKey]: {
+        ...currentSideData,
+        signageTypeName,
+        signageSubTypeName,
+      },
+    };
+
+    if (side === 1) {
+      // Keep root-level fields synced with side 1 for backwards compat
+      onUpdate({
+        ...sideUpdate,
+        signageTypeName,
+        signageSubTypeName,
+      });
+    } else {
+      onUpdate(sideUpdate);
+    }
   };
 
   const handleAnnotationNotesBlur = () => {
@@ -424,25 +415,21 @@ export function SignDetailsPanel({ annotation, onUpdate }: SignDetailsPanelProps
 
           <TabsContent value="side1" className="mt-0">
             <SideDetails
-              sideNumber={1}
               sideData={side1Data}
-              annotationId={annotation.id}
-              uploading={uploading}
-              onImageUpload={(file) => handleSideImageUpload(1, file)}
-              onImageRemove={() => handleSideImageRemove(1)}
               onDirectionChange={(dir) => handleSideDirectionChange(1, dir)}
+              signageTypes={signageTypes}
+              subTypesByParent={subTypesByParent}
+              onTypeChange={(typeName, subTypeName) => handleSideTypeChange(1, typeName, subTypeName)}
             />
           </TabsContent>
 
           <TabsContent value="side2" className="mt-0">
             <SideDetails
-              sideNumber={2}
               sideData={side2Data}
-              annotationId={annotation.id}
-              uploading={uploading}
-              onImageUpload={(file) => handleSideImageUpload(2, file)}
-              onImageRemove={() => handleSideImageRemove(2)}
               onDirectionChange={(dir) => handleSideDirectionChange(2, dir)}
+              signageTypes={signageTypes}
+              subTypesByParent={subTypesByParent}
+              onTypeChange={(typeName, subTypeName) => handleSideTypeChange(2, typeName, subTypeName)}
             />
           </TabsContent>
         </Tabs>

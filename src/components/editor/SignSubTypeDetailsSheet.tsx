@@ -10,8 +10,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { ColorPicker } from '@/components/ui/ColorPicker';
+import { SignImageUpload } from './SignImageUpload';
 import { Tables } from '@/integrations/supabase/types';
 import { Hash, Tag } from 'lucide-react';
+import { useSignImageUpload } from '@/hooks/useSignImageUpload';
 
 type SignageType = Tables<'signage_types'>;
 type SignageSubType = Tables<'signage_sub_types'>;
@@ -23,6 +25,7 @@ interface SignSubTypeDetailsSheetProps {
   onOpenChange: (open: boolean) => void;
   onRename: (signageTypeId: string, subTypeId: string, newName: string) => Promise<void>;
   onUpdateColor: (signageTypeId: string, subTypeId: string, color: string) => Promise<void>;
+  onUpdateImage: (signageTypeId: string, subTypeId: string, imageUrl: string | null) => Promise<void>;
   annotationCount: number;
 }
 
@@ -33,9 +36,11 @@ export function SignSubTypeDetailsSheet({
   onOpenChange,
   onRename,
   onUpdateColor,
+  onUpdateImage,
   annotationCount,
 }: SignSubTypeDetailsSheetProps) {
   const [name, setName] = useState('');
+  const { uploading, uploadImage, deleteImage } = useSignImageUpload();
 
   // Ref to hold latest name so the close handler always sees current state
   const nameRef = useRef(name);
@@ -69,6 +74,7 @@ export function SignSubTypeDetailsSheet({
 
   const parentColor = parentType.color || '#3B82F6';
   const currentColor = subType.color || parentColor;
+  const currentImageUrl = subType.image_url ?? undefined;
 
   const handleNameBlur = () => {
     const trimmed = name.trim();
@@ -90,6 +96,26 @@ export function SignSubTypeDetailsSheet({
 
   const handleColorChange = (color: string) => {
     onUpdateColor(parentType.id, subType.id, color);
+  };
+
+  const handleImageUpload = async (file: File) => {
+    // Delete old file from storage if replacing
+    if (currentImageUrl) {
+      await deleteImage(currentImageUrl);
+    }
+
+    const url = await uploadImage(subType.id, 'sign-sub-types', file);
+    if (url) {
+      // Optimistic DB + state update — UI reflects immediately
+      await onUpdateImage(parentType.id, subType.id, url);
+    }
+  };
+
+  const handleImageRemove = async () => {
+    if (currentImageUrl) {
+      await deleteImage(currentImageUrl);
+      await onUpdateImage(parentType.id, subType.id, null);
+    }
   };
 
   return (
@@ -151,6 +177,23 @@ export function SignSubTypeDetailsSheet({
               <p className="text-xs text-muted-foreground">
                 Inherits from parent type when not set
               </p>
+            </div>
+
+            <Separator />
+
+            {/* Sign Image */}
+            <div className="space-y-2">
+              <Label>Sign Image</Label>
+              <p className="text-xs text-muted-foreground">
+                Image for all {parentType.name} / {subType.name} signs (overrides parent type image)
+              </p>
+              <SignImageUpload
+                imageUrl={currentImageUrl}
+                uploading={uploading}
+                onUpload={handleImageUpload}
+                onRemove={handleImageRemove}
+                alt={`${subType.name} sign`}
+              />
             </div>
           </div>
         </div>

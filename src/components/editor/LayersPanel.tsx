@@ -254,6 +254,8 @@ export function LayersPanel({
           <SignDetailsPanel
             annotation={selectedAnnotation}
             onUpdate={handleSignUpdate}
+            signageTypes={signageTypes}
+            subTypesByParent={subTypesByParent}
           />
         </div>
       </div>

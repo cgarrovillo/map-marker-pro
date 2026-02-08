@@ -229,6 +229,29 @@ export function useSignageTypes(venueLayoutId: string | null) {
     [signageTypes]
   );
 
+  const updateSignageTypeImage = useCallback(
+    async (id: string, imageUrl: string | null) => {
+      // Optimistic update
+      const previousTypes = signageTypes;
+      setSignageTypes((prev) =>
+        prev.map((t) => (t.id === id ? { ...t, image_url: imageUrl } : t))
+      );
+
+      const { error } = await supabase
+        .from('signage_types')
+        .update({ image_url: imageUrl })
+        .eq('id', id);
+
+      if (error) {
+        console.error('Error updating signage type image:', error);
+        // Revert on error
+        setSignageTypes(previousTypes);
+        throw error;
+      }
+    },
+    [signageTypes]
+  );
+
   return {
     signageTypes,
     loading,
@@ -238,5 +261,6 @@ export function useSignageTypes(venueLayoutId: string | null) {
     updateSignageTypeNotes,
     updateSignageTypeColor,
     updateSignageTypeIcon,
+    updateSignageTypeImage,
   };
 }

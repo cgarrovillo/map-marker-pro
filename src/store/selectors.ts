@@ -31,6 +31,30 @@ export const selectZoomPercentage = createSelector(
   (transform) => Math.round(transform.scale * 100)
 );
 
+// Collect per-side type pairs from an annotation (with root-level fallback for backwards compat)
+function collectSideTypes(annotation: Annotation): Array<{ typeName: string; subTypeName?: string }> {
+  const sides: Array<{ typeName: string; subTypeName?: string }> = [];
+
+  // Side 1: prefer side1-level, fall back to root-level
+  const s1TypeName = annotation.side1?.signageTypeName ?? annotation.signageTypeName;
+  if (s1TypeName) {
+    sides.push({
+      typeName: s1TypeName,
+      subTypeName: annotation.side1?.signageSubTypeName ?? annotation.signageSubTypeName,
+    });
+  }
+
+  // Side 2: only side2-level (no root-level fallback for side 2)
+  if (annotation.side2?.signageTypeName) {
+    sides.push({
+      typeName: annotation.side2.signageTypeName,
+      subTypeName: annotation.side2.signageSubTypeName,
+    });
+  }
+
+  return sides;
+}
+
 // Visibility check for annotations (returns a function that can be called with an annotation)
 // All signage types (dynamic AND static) are now driven by signageTypeVisibility / signageSubTypeVisibility.
 export const selectIsAnnotationVisible = createSelector(
@@ -41,18 +65,18 @@ export const selectIsAnnotationVisible = createSelector(
     const { category, type } = annotation;
     if (category === 'signage') {
       if (type === 'ticket') {
-        // Dynamic signage types - check parent visibility, then sub-type
-        if (annotation.signageTypeName) {
-          const parentVisible = signageTypeVis[annotation.signageTypeName] ?? true;
-          if (!parentVisible) return false;
+        const sideTypes = collectSideTypes(annotation);
+        if (sideTypes.length === 0) return true; // Legacy annotations without any type
 
-          // If annotation has a sub-type, check sub-type visibility
-          if (annotation.signageSubTypeName) {
-            const subKey = `${annotation.signageTypeName}/${annotation.signageSubTypeName}`;
-            return signageSubTypeVis[subKey] ?? true;
+        // Visible if ANY side's type is visible
+        return sideTypes.some(({ typeName, subTypeName }) => {
+          const parentVisible = signageTypeVis[typeName] ?? true;
+          if (!parentVisible) return false;
+          if (subTypeName) {
+            return signageSubTypeVis[`${typeName}/${subTypeName}`] ?? true;
           }
-        }
-        return true; // Legacy ticket annotations without signageTypeName
+          return true;
+        });
       }
       // Static signage types (alcohol, accessibility, washroom)
       // Unified under signageTypeVisibility keyed by the type string

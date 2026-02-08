@@ -17,24 +17,50 @@ import {
 import { AssetStatusBadge } from './AssetStatusBadge';
 import { AssetDetailSheet } from './AssetDetailSheet';
 import { SIGN_HOLDERS, DEFAULT_SIGN_HOLDER, ORDER_STATUSES } from '@/types/annotations';
-import type { Annotation, OrderStatus } from '@/types/annotations';
+import type { Annotation, OrderStatus, SignSide } from '@/types/annotations';
 import { Tables } from '@/integrations/supabase/types';
 import { Package } from 'lucide-react';
 
 type SignageTypeRow = Tables<'signage_types'>;
+type SignageSubTypeRow = Tables<'signage_sub_types'>;
 
 interface AssetTableProps {
   annotations: Annotation[];
   onUpdateAnnotation: (id: string, updates: Partial<Annotation>) => Promise<void>;
   signageTypes?: SignageTypeRow[];
+  subTypesByParent?: Record<string, SignageSubTypeRow[]>;
+}
+
+function formatSideType(side: SignSide | undefined): string {
+  if (!side?.signageTypeName) return '-';
+  if (side.signageSubTypeName) return `${side.signageTypeName} / ${side.signageSubTypeName}`;
+  return side.signageTypeName;
+}
+
+function getSide1Data(annotation: Annotation): SignSide | undefined {
+  if (annotation.side1) {
+    return {
+      ...annotation.side1,
+      signageTypeName: annotation.side1.signageTypeName ?? annotation.signageTypeName,
+      signageSubTypeName: annotation.side1.signageSubTypeName ?? annotation.signageSubTypeName,
+    };
+  }
+  if (annotation.signageTypeName) {
+    return {
+      signageTypeName: annotation.signageTypeName,
+      signageSubTypeName: annotation.signageSubTypeName,
+    };
+  }
+  return undefined;
 }
 
 function getDisplayLabel(annotation: Annotation): string {
   if (annotation.label) return annotation.label;
-  const parts: string[] = [];
-  if (annotation.signageTypeName) parts.push(annotation.signageTypeName);
-  if (annotation.signageSubTypeName) parts.push(annotation.signageSubTypeName);
-  if (parts.length > 0) return parts.join(' - ');
+  const s1 = formatSideType(getSide1Data(annotation));
+  const s2 = formatSideType(annotation.side2);
+  if (s1 !== '-' && s2 !== '-') return `${s1} | ${s2}`;
+  if (s1 !== '-') return s1;
+  if (s2 !== '-') return s2;
   return 'Unnamed Sign';
 }
 
@@ -43,7 +69,7 @@ function getHolderLabel(annotation: Annotation): string {
   return SIGN_HOLDERS[holder].label;
 }
 
-export function AssetTable({ annotations, onUpdateAnnotation, signageTypes = [] }: AssetTableProps) {
+export function AssetTable({ annotations, onUpdateAnnotation, signageTypes = [], subTypesByParent = {} }: AssetTableProps) {
   const [selectedAnnotation, setSelectedAnnotation] = useState<Annotation | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
 
@@ -92,8 +118,8 @@ export function AssetTable({ annotations, onUpdateAnnotation, signageTypes = [] 
           <TableHeader>
             <TableRow>
               <TableHead className="w-[200px]">Label</TableHead>
-              <TableHead>Signage Type</TableHead>
-              <TableHead>Sub-Type</TableHead>
+              <TableHead>Side 1 Type</TableHead>
+              <TableHead>Side 2 Type</TableHead>
               <TableHead>Holder</TableHead>
               <TableHead className="w-[180px]">Status</TableHead>
               <TableHead>Notes</TableHead>
@@ -112,8 +138,8 @@ export function AssetTable({ annotations, onUpdateAnnotation, signageTypes = [] 
                   <TableCell className="font-medium">
                     {getDisplayLabel(annotation)}
                   </TableCell>
-                  <TableCell>{annotation.signageTypeName ?? '-'}</TableCell>
-                  <TableCell>{annotation.signageSubTypeName ?? '-'}</TableCell>
+                  <TableCell>{formatSideType(getSide1Data(annotation))}</TableCell>
+                  <TableCell>{formatSideType(annotation.side2)}</TableCell>
                   <TableCell className="text-sm">{getHolderLabel(annotation)}</TableCell>
                   <TableCell onClick={(e) => e.stopPropagation()}>
                     <Select
@@ -152,6 +178,7 @@ export function AssetTable({ annotations, onUpdateAnnotation, signageTypes = [] 
         onOpenChange={setSheetOpen}
         onUpdateAnnotation={onUpdateAnnotation}
         signageTypes={signageTypes}
+        subTypesByParent={subTypesByParent}
       />
     </>
   );

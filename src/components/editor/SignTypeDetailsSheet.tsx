@@ -11,8 +11,10 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
 import { ColorPicker } from '@/components/ui/ColorPicker';
+import { SignImageUpload } from './SignImageUpload';
 import { Tables } from '@/integrations/supabase/types';
 import { Hash } from 'lucide-react';
+import { useSignImageUpload } from '@/hooks/useSignImageUpload';
 
 type SignageType = Tables<'signage_types'>;
 
@@ -34,6 +36,7 @@ interface SignTypeDetailsSheetProps {
   onUpdateNotes: (id: string, notes: string | null) => Promise<void>;
   onUpdateColor: (id: string, color: string) => Promise<void>;
   onUpdateIcon: (id: string, icon: string | null) => Promise<void>;
+  onUpdateImage: (id: string, imageUrl: string | null) => Promise<void>;
   annotationCount: number;
 }
 
@@ -45,11 +48,13 @@ export function SignTypeDetailsSheet({
   onUpdateNotes,
   onUpdateColor,
   onUpdateIcon,
+  onUpdateImage,
   annotationCount,
 }: SignTypeDetailsSheetProps) {
   const [name, setName] = useState('');
   const [notes, setNotes] = useState('');
   const [emoji, setEmoji] = useState('');
+  const { uploading, uploadImage, deleteImage } = useSignImageUpload();
 
   // Refs to hold latest local values so the close handler always sees current state
   const nameRef = useRef(name);
@@ -101,6 +106,7 @@ export function SignTypeDetailsSheet({
   if (!signageType) return null;
 
   const currentColor = signageType.color || '#3B82F6';
+  const currentImageUrl = signageType.image_url ?? undefined;
 
   const handleNameBlur = () => {
     const trimmed = name.trim();
@@ -130,6 +136,26 @@ export function SignTypeDetailsSheet({
 
   const handleColorChange = (color: string) => {
     onUpdateColor(signageType.id, color);
+  };
+
+  const handleImageUpload = async (file: File) => {
+    // Delete old file from storage if replacing
+    if (currentImageUrl) {
+      await deleteImage(currentImageUrl);
+    }
+
+    const url = await uploadImage(signageType.id, 'sign-types', file);
+    if (url) {
+      // Optimistic DB + state update — UI reflects immediately
+      await onUpdateImage(signageType.id, url);
+    }
+  };
+
+  const handleImageRemove = async () => {
+    if (currentImageUrl) {
+      await deleteImage(currentImageUrl);
+      await onUpdateImage(signageType.id, null);
+    }
   };
 
   return (
@@ -221,6 +247,23 @@ export function SignTypeDetailsSheet({
               <p className="text-xs text-muted-foreground">
                 Used as the default color for all sub-types
               </p>
+            </div>
+
+            <Separator />
+
+            {/* Sign Image */}
+            <div className="space-y-2">
+              <Label>Sign Image</Label>
+              <p className="text-xs text-muted-foreground">
+                Default image for all {signageType.name} signs (sub-types can override)
+              </p>
+              <SignImageUpload
+                imageUrl={currentImageUrl}
+                uploading={uploading}
+                onUpload={handleImageUpload}
+                onRemove={handleImageRemove}
+                alt={`${signageType.name} sign`}
+              />
             </div>
 
             <Separator />

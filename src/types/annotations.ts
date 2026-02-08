@@ -23,9 +23,11 @@ export type SignDirection =
 export type SignHolderType = 'sign-pedestal-1' | 'sign-pedestal-2';
 
 // Interface for side-specific sign data
+// NOTE: Images are stored on signage_types / signage_sub_types, not per-annotation.
 export interface SignSide {
-  imageUrl?: string;
   direction?: SignDirection;
+  signageTypeName?: string;
+  signageSubTypeName?: string;
 }
 
 export interface Point {

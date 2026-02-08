@@ -78,6 +78,7 @@ export type Database = {
           color: string | null
           created_at: string
           id: string
+          image_url: string | null
           name: string
           signage_type_id: string
           updated_at: string
@@ -86,6 +87,7 @@ export type Database = {
           color?: string | null
           created_at?: string
           id?: string
+          image_url?: string | null
           name: string
           signage_type_id: string
           updated_at?: string
@@ -94,6 +96,7 @@ export type Database = {
           color?: string | null
           created_at?: string
           id?: string
+          image_url?: string | null
           name?: string
           signage_type_id?: string
           updated_at?: string
@@ -114,6 +117,7 @@ export type Database = {
           created_at: string
           icon: string | null
           id: string
+          image_url: string | null
           is_default: boolean
           name: string
           notes: string | null
@@ -125,6 +129,7 @@ export type Database = {
           created_at?: string
           icon?: string | null
           id?: string
+          image_url?: string | null
           is_default?: boolean
           name: string
           notes?: string | null
@@ -136,6 +141,7 @@ export type Database = {
           created_at?: string
           icon?: string | null
           id?: string
+          image_url?: string | null
           is_default?: boolean
           name?: string
           notes?: string | null

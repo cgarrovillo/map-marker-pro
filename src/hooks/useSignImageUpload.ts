@@ -4,16 +4,32 @@ import { supabase } from '@/integrations/supabase/client';
 interface UseSignImageUploadReturn {
   uploading: boolean;
   error: string | null;
-  uploadSignImage: (annotationId: string, side: 1 | 2, file: File) => Promise<string | null>;
-  deleteSignImage: (imageUrl: string) => Promise<void>;
+  /** Upload a file to Supabase Storage. Returns the public URL on success. */
+  uploadImage: (
+    id: string,
+    folder: 'sign-types' | 'sign-sub-types',
+    file: File,
+  ) => Promise<string | null>;
+  /** Delete a file from Supabase Storage by its public URL. */
+  deleteImage: (imageUrl: string) => Promise<void>;
 }
 
+/**
+ * Storage-only hook for sign type images.
+ * Handles uploading/deleting files in the `venue-images` bucket.
+ * Does NOT write to the database — callers should use the
+ * optimistic-update methods from useSignageTypes / useSignageSubTypes.
+ */
 export function useSignImageUpload(): UseSignImageUploadReturn {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const uploadSignImage = useCallback(
-    async (annotationId: string, side: 1 | 2, file: File): Promise<string | null> => {
+  const uploadImage = useCallback(
+    async (
+      id: string,
+      folder: 'sign-types' | 'sign-sub-types',
+      file: File,
+    ): Promise<string | null> => {
       setUploading(true);
       setError(null);
 
@@ -30,20 +46,15 @@ export function useSignImageUpload(): UseSignImageUploadReturn {
           throw new Error('File too large. Maximum size is 5MB.');
         }
 
-        // Create file path: signs/{annotationId}/side{side}/{timestamp}.{ext}
         const fileExt = file.name.split('.').pop()?.toLowerCase() || 'jpg';
-        const filePath = `signs/${annotationId}/side${side}/${Date.now()}.${fileExt}`;
+        const filePath = `${folder}/${id}/${Date.now()}.${fileExt}`;
 
-        // Upload to Supabase storage
         const { error: uploadError } = await supabase.storage
           .from('venue-images')
           .upload(filePath, file);
 
-        if (uploadError) {
-          throw uploadError;
-        }
+        if (uploadError) throw uploadError;
 
-        // Get public URL
         const { data } = supabase.storage
           .from('venue-images')
           .getPublicUrl(filePath);
@@ -52,43 +63,26 @@ export function useSignImageUpload(): UseSignImageUploadReturn {
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to upload image';
         setError(message);
-        console.error('Error uploading sign image:', err);
+        console.error('Error uploading sign type image:', err);
         return null;
       } finally {
         setUploading(false);
       }
     },
-    []
+    [],
   );
 
-  const deleteSignImage = useCallback(async (imageUrl: string): Promise<void> => {
+  const deleteImage = useCallback(async (imageUrl: string): Promise<void> => {
     try {
-      // Extract the file path from the URL
-      // URL format: https://{project}.supabase.co/storage/v1/object/public/venue-images/{path}
       const urlParts = imageUrl.split('/venue-images/');
-      if (urlParts.length !== 2) {
-        console.error('Invalid image URL format');
-        return;
-      }
-
-      const filePath = urlParts[1];
-
-      const { error: deleteError } = await supabase.storage
-        .from('venue-images')
-        .remove([filePath]);
-
-      if (deleteError) {
-        console.error('Error deleting sign image:', deleteError);
+      if (urlParts.length === 2) {
+        const filePath = urlParts[1];
+        await supabase.storage.from('venue-images').remove([filePath]);
       }
     } catch (err) {
-      console.error('Error deleting sign image:', err);
+      console.error('Error deleting sign type image:', err);
     }
   }, []);
 
-  return {
-    uploading,
-    error,
-    uploadSignImage,
-    deleteSignImage,
-  };
+  return { uploading, error, uploadImage, deleteImage };
 }

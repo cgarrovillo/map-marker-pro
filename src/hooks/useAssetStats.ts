@@ -55,12 +55,23 @@ export function useAssetStats(annotations: Annotation[], filters: AssetFilters) 
     };
   }, [signageAnnotations]);
 
-  // Get unique signage type names for filter options
+  // Collect all type names that appear on either side of an annotation
+  function getAnnotationTypeNames(a: Annotation): string[] {
+    const names: string[] = [];
+    // Side 1: prefer side1-level, fall back to root-level
+    const s1Name = a.side1?.signageTypeName ?? a.signageTypeName;
+    if (s1Name) names.push(s1Name);
+    // Side 2: only side2-level
+    if (a.side2?.signageTypeName) names.push(a.side2.signageTypeName);
+    return names;
+  }
+
+  // Get unique signage type names for filter options (from both sides)
   const signageTypeNames = useMemo(() => {
     const names = new Set<string>();
     for (const a of signageAnnotations) {
-      if (a.signageTypeName) {
-        names.add(a.signageTypeName);
+      for (const n of getAnnotationTypeNames(a)) {
+        names.add(n);
       }
     }
     return Array.from(names).sort();
@@ -69,14 +80,23 @@ export function useAssetStats(annotations: Annotation[], filters: AssetFilters) 
   // Apply filters
   const filteredAnnotations = useMemo(() => {
     return signageAnnotations.filter((a) => {
-      // Search filter
+      // Search filter — match against both sides' types in addition to root fields
       if (filters.search) {
         const query = filters.search.toLowerCase();
         const matchesLabel = a.label?.toLowerCase().includes(query);
         const matchesNotes = a.notes?.toLowerCase().includes(query);
-        const matchesType = a.signageTypeName?.toLowerCase().includes(query);
-        const matchesSubType = a.signageSubTypeName?.toLowerCase().includes(query);
-        if (!matchesLabel && !matchesNotes && !matchesType && !matchesSubType) {
+        const matchesRootType = a.signageTypeName?.toLowerCase().includes(query);
+        const matchesRootSubType = a.signageSubTypeName?.toLowerCase().includes(query);
+        const matchesSide1Type = a.side1?.signageTypeName?.toLowerCase().includes(query);
+        const matchesSide1SubType = a.side1?.signageSubTypeName?.toLowerCase().includes(query);
+        const matchesSide2Type = a.side2?.signageTypeName?.toLowerCase().includes(query);
+        const matchesSide2SubType = a.side2?.signageSubTypeName?.toLowerCase().includes(query);
+        if (
+          !matchesLabel && !matchesNotes &&
+          !matchesRootType && !matchesRootSubType &&
+          !matchesSide1Type && !matchesSide1SubType &&
+          !matchesSide2Type && !matchesSide2SubType
+        ) {
           return false;
         }
       }
@@ -86,9 +106,10 @@ export function useAssetStats(annotations: Annotation[], filters: AssetFilters) 
         if (getEffectiveStatus(a) !== filters.status) return false;
       }
 
-      // Signage type filter
+      // Signage type filter — match if EITHER side has the filtered type
       if (filters.signageType !== 'all') {
-        if (a.signageTypeName !== filters.signageType) return false;
+        const typeNames = getAnnotationTypeNames(a);
+        if (!typeNames.includes(filters.signageType)) return false;
       }
 
       // Holder type filter
