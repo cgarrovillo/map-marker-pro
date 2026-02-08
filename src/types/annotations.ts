@@ -44,7 +44,7 @@ export interface Annotation {
   signHolder?: SignHolderType;
   side1?: SignSide;  // Side 1 details
   side2?: SignSide;  // Side 2 details (only used if holder is 2-sided)
-  // Signage type - parent category name like "Tickets", "Washroom", "Accessibility"
+  // Signage type - parent category name like "Tickets", "Washroom", "Elevators"
   // (Updated in migration 20260205000000 to support two-level hierarchy)
   signageTypeName?: string;
   // Signage sub-type - specific type within a category like "VIP", "Men", "Wheelchair"
@@ -101,11 +101,11 @@ export interface AnnotationConfig {
   icon: string;
 }
 
-// Static signage types (ticket types are dynamic and loaded from database)
+// Static signage types (legacy - kept for layer visibility and backwards compatibility)
 export const SIGNAGE_TYPES: Partial<Record<SignageType, { label: string; icon: string }>> = {
-  alcohol: { label: 'No Alcohol', icon: 'Wine' },
-  accessibility: { label: 'Accessibility', icon: 'Accessibility' },
-  washroom: { label: 'Washroom', icon: 'Bath' },
+  alcohol: { label: 'No Alcohol', icon: '🚫' },
+  accessibility: { label: 'Elevators', icon: '♿' },
+  washroom: { label: 'Washroom', icon: '🚻' },
 };
 
 // Washroom sub-type configuration

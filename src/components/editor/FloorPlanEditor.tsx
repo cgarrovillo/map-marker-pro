@@ -69,6 +69,7 @@ export function FloorPlanEditor() {
     renameSignageType,
     updateSignageTypeNotes,
     updateSignageTypeColor,
+    updateSignageTypeIcon,
   } = useSignageTypes(activeLayoutId);
 
   // Memoize signage type IDs for sub-types hook
@@ -467,6 +468,7 @@ export function FloorPlanEditor() {
                 onCreateSubType={createSubType}
                 onDeleteSubType={deleteSubType}
                 onUpdateSignageTypeColor={updateSignageTypeColor}
+                onUpdateSignageTypeIcon={updateSignageTypeIcon}
                 onUpdateSubTypeColor={updateSubTypeColor}
                 onRenameSignageType={renameSignageType}
                 onUpdateSignageTypeNotes={updateSignageTypeNotes}

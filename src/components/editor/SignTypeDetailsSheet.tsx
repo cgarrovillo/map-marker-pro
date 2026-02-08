@@ -16,6 +16,16 @@ import { Hash } from 'lucide-react';
 
 type SignageType = Tables<'signage_types'>;
 
+// Map legacy Lucide icon names to emojis (for pre-migration data)
+const LEGACY_ICON_TO_EMOJI: Record<string, string> = {
+  Wine: '🚫', Bath: '🚻', Ticket: '🎫', Accessibility: '♿',
+};
+
+function resolveEmoji(icon: string | null): string {
+  if (!icon) return '📍';
+  return LEGACY_ICON_TO_EMOJI[icon] ?? icon;
+}
+
 interface SignTypeDetailsSheetProps {
   signageType: SignageType | null;
   open: boolean;
@@ -23,6 +33,7 @@ interface SignTypeDetailsSheetProps {
   onRename: (id: string, newName: string) => Promise<void>;
   onUpdateNotes: (id: string, notes: string | null) => Promise<void>;
   onUpdateColor: (id: string, color: string) => Promise<void>;
+  onUpdateIcon: (id: string, icon: string | null) => Promise<void>;
   annotationCount: number;
 }
 
@@ -33,10 +44,12 @@ export function SignTypeDetailsSheet({
   onRename,
   onUpdateNotes,
   onUpdateColor,
+  onUpdateIcon,
   annotationCount,
 }: SignTypeDetailsSheetProps) {
   const [name, setName] = useState('');
   const [notes, setNotes] = useState('');
+  const [emoji, setEmoji] = useState('');
 
   // Refs to hold latest local values so the close handler always sees current state
   const nameRef = useRef(name);
@@ -44,11 +57,16 @@ export function SignTypeDetailsSheet({
   nameRef.current = name;
   notesRef.current = notes;
 
+  // Ref to hold latest emoji so the close handler always sees current state
+  const emojiRef = useRef(emoji);
+  emojiRef.current = emoji;
+
   // Sync local state when signageType changes
   useEffect(() => {
     if (signageType) {
       setName(signageType.name);
       setNotes(signageType.notes ?? '');
+      setEmoji(resolveEmoji(signageType.icon));
     }
   }, [signageType]);
 
@@ -66,7 +84,12 @@ export function SignTypeDetailsSheet({
     if (newNotes !== (signageType.notes ?? null)) {
       onUpdateNotes(signageType.id, newNotes);
     }
-  }, [signageType, onRename, onUpdateNotes]);
+
+    const currentEmoji = emojiRef.current.trim() || null;
+    if (currentEmoji !== (signageType.icon ?? null)) {
+      onUpdateIcon(signageType.id, currentEmoji);
+    }
+  }, [signageType, onRename, onUpdateNotes, onUpdateIcon]);
 
   const handleOpenChange = useCallback((nextOpen: boolean) => {
     if (!nextOpen) {
@@ -143,6 +166,42 @@ export function SignTypeDetailsSheet({
               />
               <p className="text-xs text-muted-foreground">
                 Press Enter to save, Escape to cancel
+              </p>
+            </div>
+
+            {/* Emoji Icon */}
+            <div className="space-y-2">
+              <Label htmlFor="type-emoji">Emoji Icon</Label>
+              <div className="flex items-center gap-3">
+                <div
+                  className="w-10 h-10 rounded-lg flex items-center justify-center text-xl"
+                  style={{ backgroundColor: currentColor }}
+                >
+                  {emoji || '📍'}
+                </div>
+                <Input
+                  id="type-emoji"
+                  value={emoji}
+                  onChange={(e) => {
+                    // Allow only emoji-length input (grapheme clusters)
+                    const val = e.target.value;
+                    if ([...val].length <= 2) {
+                      setEmoji(val);
+                    }
+                  }}
+                  onBlur={() => {
+                    const trimmed = emoji.trim();
+                    const newIcon = trimmed || null;
+                    if (newIcon !== (signageType.icon ?? null)) {
+                      onUpdateIcon(signageType.id, newIcon);
+                    }
+                  }}
+                  placeholder="📍"
+                  className="w-20 text-center text-lg"
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Choose an emoji to represent this signage type
               </p>
             </div>
 

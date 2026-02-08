@@ -70,7 +70,7 @@ export function useSignageTypes(venueLayoutId: string | null) {
   }, [venueLayoutId]);
 
   const createSignageType = useCallback(
-    async (name: string): Promise<SignageType | null> => {
+    async (name: string, icon?: string, color?: string): Promise<SignageType | null> => {
       if (!venueLayoutId) return null;
 
       const trimmedName = name.trim();
@@ -87,6 +87,8 @@ export function useSignageTypes(venueLayoutId: string | null) {
       const newSignageType: SignageTypeInsert = {
         venue_layout_id: venueLayoutId,
         name: trimmedName,
+        ...(icon && { icon }),
+        ...(color && { color }),
       };
 
       const { data, error } = await supabase
@@ -204,6 +206,29 @@ export function useSignageTypes(venueLayoutId: string | null) {
     [signageTypes]
   );
 
+  const updateSignageTypeIcon = useCallback(
+    async (id: string, icon: string | null) => {
+      // Optimistic update
+      const previousTypes = signageTypes;
+      setSignageTypes((prev) =>
+        prev.map((t) => (t.id === id ? { ...t, icon } : t))
+      );
+
+      const { error } = await supabase
+        .from('signage_types')
+        .update({ icon })
+        .eq('id', id);
+
+      if (error) {
+        console.error('Error updating signage type icon:', error);
+        // Revert on error
+        setSignageTypes(previousTypes);
+        throw error;
+      }
+    },
+    [signageTypes]
+  );
+
   return {
     signageTypes,
     loading,
@@ -212,5 +237,6 @@ export function useSignageTypes(venueLayoutId: string | null) {
     renameSignageType,
     updateSignageTypeNotes,
     updateSignageTypeColor,
+    updateSignageTypeIcon,
   };
 }
