@@ -32,7 +32,7 @@ const initialState: CanvasState = {
   isPanning: false,
   draggingAnnotation: null,
   minZoom: 0.25,
-  maxZoom: 4,
+  maxZoom: 10,
   zoomStep: 0.25,
 };
 
