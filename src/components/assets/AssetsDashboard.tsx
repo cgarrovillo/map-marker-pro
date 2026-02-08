@@ -1,9 +1,16 @@
 import { useState } from 'react';
-import { SignSummaryCards, StandSummaryCards } from './AssetSummaryCards';
-import { SignFilterBar, StandFilterBar, defaultSignFilters, defaultStandFilters } from './AssetFilters';
-import { SignTable, StandTable } from './AssetTable';
+import { SignSummaryCards, StandSummaryCards, DesignSummaryCards } from './AssetSummaryCards';
+import {
+  SignFilterBar,
+  StandFilterBar,
+  DesignFilterBar,
+  defaultSignFilters,
+  defaultStandFilters,
+  defaultDesignFilters,
+} from './AssetFilters';
+import { SignTable, StandTable, DesignTable } from './AssetTable';
 import { useAssetStats } from '@/hooks/useAssetStats';
-import type { SignFilters, StandFilters } from '@/hooks/useAssetStats';
+import type { SignFilters, StandFilters, DesignFilters } from '@/hooks/useAssetStats';
 import { Package } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -32,14 +39,17 @@ export function AssetsDashboard({
 }: AssetsDashboardProps) {
   const [signFilters, setSignFilters] = useState<SignFilters>(defaultSignFilters);
   const [standFilters, setStandFilters] = useState<StandFilters>(defaultStandFilters);
+  const [designFilters, setDesignFilters] = useState<DesignFilters>(defaultDesignFilters);
 
   const {
     signStats,
     standStats,
+    designStats,
     signageTypeNames,
-    filteredSignRows,
+    filteredSignGroupRows,
+    filteredDesignRows,
     filteredStandRows,
-  } = useAssetStats(annotations, signFilters, standFilters);
+  } = useAssetStats(annotations, signFilters, standFilters, designFilters);
 
   if (!activeEvent || !activeLayout) {
     return (
@@ -76,13 +86,30 @@ export function AssetsDashboard({
           </p>
         </div>
 
-        <Tabs defaultValue="signs" className="space-y-6">
+        <Tabs defaultValue="designs" className="space-y-6">
           <TabsList>
+            <TabsTrigger value="designs">Designs</TabsTrigger>
             <TabsTrigger value="signs">Signs</TabsTrigger>
             <TabsTrigger value="stands">Stands</TabsTrigger>
           </TabsList>
 
-          {/* ----- Signs tab ----- */}
+          {/* ----- Designs tab ----- */}
+          <TabsContent value="designs" className="space-y-6">
+            <DesignSummaryCards stats={designStats} />
+
+            <DesignFilterBar
+              filters={designFilters}
+              onFiltersChange={setDesignFilters}
+              signageTypeNames={signageTypeNames}
+            />
+
+            <DesignTable
+              rows={filteredDesignRows}
+              onUpdateAnnotation={onUpdateAnnotation}
+            />
+          </TabsContent>
+
+          {/* ----- Signs tab (order fulfillment) ----- */}
           <TabsContent value="signs" className="space-y-6">
             <SignSummaryCards stats={signStats} />
 
@@ -93,10 +120,8 @@ export function AssetsDashboard({
             />
 
             <SignTable
-              rows={filteredSignRows}
+              rows={filteredSignGroupRows}
               onUpdateAnnotation={onUpdateAnnotation}
-              signageTypes={signageTypes}
-              subTypesByParent={subTypesByParent}
             />
           </TabsContent>
 

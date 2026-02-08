@@ -8,9 +8,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Search, X } from 'lucide-react';
-import { SIGN_STATUSES, STAND_STATUSES, SIGN_HOLDERS } from '@/types/annotations';
-import type { SignStatus, StandStatus, SignHolderType } from '@/types/annotations';
-import type { SignFilters, StandFilters } from '@/hooks/useAssetStats';
+import { SIGN_STATUSES, STAND_STATUSES, DESIGN_STATUSES, SIGN_HOLDERS } from '@/types/annotations';
+import type { SignStatus, StandStatus, DesignStatus, SignHolderType } from '@/types/annotations';
+import type { SignFilters, StandFilters, DesignFilters } from '@/hooks/useAssetStats';
 
 // ---------------------------------------------------------------------------
 // Defaults
@@ -28,8 +28,14 @@ export const defaultStandFilters: StandFilters = {
   standType: 'all',
 };
 
+export const defaultDesignFilters: DesignFilters = {
+  search: '',
+  status: 'all',
+  signageType: 'all',
+};
+
 // ---------------------------------------------------------------------------
-// Sign Filters
+// Sign Filters (order fulfillment)
 // ---------------------------------------------------------------------------
 
 interface SignFiltersProps {
@@ -52,7 +58,7 @@ export function SignFilterBar({ filters, onFiltersChange, signageTypeNames }: Si
       <div className="relative flex-1 min-w-[200px] max-w-sm">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
-          placeholder="Search by label, type, or notes..."
+          placeholder="Search by type, direction, or notes..."
           value={filters.search}
           onChange={(e) =>
             onFiltersChange({ ...filters, search: e.target.value })
@@ -104,6 +110,92 @@ export function SignFilterBar({ filters, onFiltersChange, signageTypeNames }: Si
           variant="ghost"
           size="sm"
           onClick={() => onFiltersChange(defaultSignFilters)}
+          className="text-muted-foreground"
+        >
+          <X className="h-4 w-4 mr-1" />
+          Clear
+        </Button>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Design Filters
+// ---------------------------------------------------------------------------
+
+interface DesignFiltersProps {
+  filters: DesignFilters;
+  onFiltersChange: (filters: DesignFilters) => void;
+  signageTypeNames: string[];
+}
+
+function hasActiveDesignFilters(filters: DesignFilters): boolean {
+  return (
+    filters.search !== '' ||
+    filters.status !== 'all' ||
+    filters.signageType !== 'all'
+  );
+}
+
+export function DesignFilterBar({ filters, onFiltersChange, signageTypeNames }: DesignFiltersProps) {
+  return (
+    <div className="flex flex-wrap items-center gap-3">
+      <div className="relative flex-1 min-w-[200px] max-w-sm">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Search by type, direction, or notes..."
+          value={filters.search}
+          onChange={(e) =>
+            onFiltersChange({ ...filters, search: e.target.value })
+          }
+          className="pl-9"
+        />
+      </div>
+
+      <Select
+        value={filters.status}
+        onValueChange={(value) =>
+          onFiltersChange({ ...filters, status: value as DesignStatus | 'all' })
+        }
+      >
+        <SelectTrigger className="w-[160px]">
+          <SelectValue placeholder="Status" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">All Statuses</SelectItem>
+          {(Object.keys(DESIGN_STATUSES) as DesignStatus[]).map((status) => (
+            <SelectItem key={status} value={status}>
+              {DESIGN_STATUSES[status].label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      <Select
+        value={filters.signageType}
+        onValueChange={(value) =>
+          onFiltersChange({ ...filters, signageType: value })
+        }
+      >
+        <SelectTrigger className="w-[160px]">
+          <SelectValue placeholder="Signage Type" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">All Types</SelectItem>
+          {signageTypeNames.map((name) => (
+            <SelectItem key={name} value={name}>
+              {name}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      {hasActiveDesignFilters(filters) && (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => onFiltersChange(defaultDesignFilters)}
           className="text-muted-foreground"
         >
           <X className="h-4 w-4 mr-1" />

@@ -104,14 +104,14 @@ function resolveSignImage(
 function getEffectiveSignStatus(side: SignSide | undefined, annotation: Annotation): SignStatus {
   if (side?.signStatus) return side.signStatus;
   const legacy = annotation.orderStatus;
-  if (!legacy) return 'in_design';
+  if (!legacy) return 'not_ordered';
   const map: Record<string, SignStatus> = {
-    not_ordered: 'in_design',
+    not_ordered: 'not_ordered',
     ordered: 'ordered',
     shipped: 'shipped',
     installed: 'installed',
   };
-  return map[legacy] ?? 'in_design';
+  return map[legacy] ?? 'not_ordered';
 }
 
 function getEffectiveStandStatus(annotation: Annotation): StandStatus {

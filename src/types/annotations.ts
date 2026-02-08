@@ -22,11 +22,14 @@ export type SignDirection =
 
 export type SignHolderType = 'sign-pedestal-1' | 'sign-pedestal-2';
 
-// New asset tracking — per-sign-face statuses
-export type SignStatus = 'in_design' | 'ordered' | 'shipped' | 'delivered' | 'installed';
+// Asset tracking — per-sign-face order statuses (no "in_design"; that lives in DesignStatus)
+export type SignStatus = 'not_ordered' | 'ordered' | 'shipped' | 'delivered' | 'installed';
 
-// New asset tracking — per-stand statuses
+// Asset tracking — per-stand statuses
 export type StandStatus = 'not_ordered' | 'ordered' | 'shipped' | 'delivered';
+
+// Asset tracking — design workflow statuses (Designs tab)
+export type DesignStatus = 'not_started' | 'in_design' | 'completed';
 
 // Interface for side-specific sign data
 // NOTE: Images are stored on signage_types / signage_sub_types, not per-annotation.
@@ -34,8 +37,10 @@ export interface SignSide {
   direction?: SignDirection;
   signageTypeName?: string;
   signageSubTypeName?: string;
-  // Per-face sign status (new asset tracking)
+  // Per-face sign order status
   signStatus?: SignStatus;
+  // Per-face design status
+  designStatus?: DesignStatus;
 }
 
 export interface Point {
@@ -100,7 +105,7 @@ export const ORDER_STATUSES: Record<OrderStatus, { label: string }> = {
 };
 
 export const SIGN_STATUSES: Record<SignStatus, { label: string }> = {
-  in_design: { label: 'In Design' },
+  not_ordered: { label: 'Not Ordered' },
   ordered: { label: 'Ordered' },
   shipped: { label: 'Shipped' },
   delivered: { label: 'Delivered' },
@@ -112,6 +117,12 @@ export const STAND_STATUSES: Record<StandStatus, { label: string }> = {
   ordered: { label: 'Ordered' },
   shipped: { label: 'Shipped' },
   delivered: { label: 'Delivered' },
+};
+
+export const DESIGN_STATUSES: Record<DesignStatus, { label: string }> = {
+  not_started: { label: 'Not Started' },
+  in_design: { label: 'In Design' },
+  completed: { label: 'Completed' },
 };
 
 // Helper to determine if an annotation type uses lines or markers

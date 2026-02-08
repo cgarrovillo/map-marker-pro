@@ -1,13 +1,17 @@
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import type { SignStatus, StandStatus } from '@/types/annotations';
-import { SIGN_STATUSES, STAND_STATUSES } from '@/types/annotations';
+import type { SignStatus, StandStatus, DesignStatus } from '@/types/annotations';
+import { SIGN_STATUSES, STAND_STATUSES, DESIGN_STATUSES } from '@/types/annotations';
 
-type AssetStatus = SignStatus | StandStatus;
+type AssetStatus = SignStatus | StandStatus | DesignStatus;
 
 const statusStyles: Record<AssetStatus, string> = {
+  not_started:
+    'bg-muted text-muted-foreground border-muted-foreground/20 hover:bg-muted',
   in_design:
     'bg-purple-500/15 text-purple-500 border-purple-500/25 hover:bg-purple-500/15',
+  completed:
+    'bg-emerald-500/15 text-emerald-500 border-emerald-500/25 hover:bg-emerald-500/15',
   not_ordered:
     'bg-muted text-muted-foreground border-muted-foreground/20 hover:bg-muted',
   ordered:
@@ -20,13 +24,16 @@ const statusStyles: Record<AssetStatus, string> = {
     'bg-green-500/15 text-green-500 border-green-500/25 hover:bg-green-500/15',
 };
 
-// Merged label lookup — sign statuses are a superset so they cover all keys
+// Merged label lookup
 const STATUS_LABELS: Record<AssetStatus, string> = {
   ...Object.fromEntries(
     Object.entries(STAND_STATUSES).map(([k, v]) => [k, v.label]),
   ),
   ...Object.fromEntries(
     Object.entries(SIGN_STATUSES).map(([k, v]) => [k, v.label]),
+  ),
+  ...Object.fromEntries(
+    Object.entries(DESIGN_STATUSES).map(([k, v]) => [k, v.label]),
   ),
 } as Record<AssetStatus, string>;
 

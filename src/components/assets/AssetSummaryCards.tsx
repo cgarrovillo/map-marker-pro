@@ -7,11 +7,13 @@ import {
   CircleDashed,
   Pen,
   PackageCheck,
+  CircleCheck,
+  CircleDot,
 } from 'lucide-react';
-import type { SignStats, StandStats } from '@/hooks/useAssetStats';
+import type { SignStats, StandStats, DesignStats } from '@/hooks/useAssetStats';
 
 // ---------------------------------------------------------------------------
-// Signs
+// Signs (order fulfillment)
 // ---------------------------------------------------------------------------
 
 interface SignSummaryCardsProps {
@@ -33,13 +35,11 @@ export function SignSummaryCards({ stats }: SignSummaryCardsProps) {
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">In Design</CardTitle>
-          <Pen className="h-4 w-4 text-purple-500" />
+          <CardTitle className="text-sm font-medium">Not Ordered</CardTitle>
+          <CircleDashed className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold text-purple-500">
-            {stats.byStatus.in_design}
-          </div>
+          <div className="text-2xl font-bold">{stats.byStatus.not_ordered}</div>
         </CardContent>
       </Card>
 
@@ -87,6 +87,64 @@ export function SignSummaryCards({ stats }: SignSummaryCardsProps) {
         <CardContent>
           <div className="text-2xl font-bold text-green-500">
             {stats.byStatus.installed}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Designs
+// ---------------------------------------------------------------------------
+
+interface DesignSummaryCardsProps {
+  stats: DesignStats;
+}
+
+export function DesignSummaryCards({ stats }: DesignSummaryCardsProps) {
+  return (
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Total Designs</CardTitle>
+          <Package className="h-4 w-4 text-muted-foreground" />
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold">{stats.total}</div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Not Started</CardTitle>
+          <CircleDot className="h-4 w-4 text-muted-foreground" />
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold">{stats.byStatus.not_started}</div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">In Design</CardTitle>
+          <Pen className="h-4 w-4 text-purple-500" />
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold text-purple-500">
+            {stats.byStatus.in_design}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Completed</CardTitle>
+          <CircleCheck className="h-4 w-4 text-emerald-500" />
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold text-emerald-500">
+            {stats.byStatus.completed}
           </div>
         </CardContent>
       </Card>

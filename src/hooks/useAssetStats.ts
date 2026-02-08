@@ -1,11 +1,13 @@
 import { useMemo } from 'react';
-import { DEFAULT_SIGN_HOLDER } from '@/types/annotations';
+import { DEFAULT_SIGN_HOLDER, SIGN_DIRECTIONS } from '@/types/annotations';
 import type {
   Annotation,
+  DesignStatus,
+  SignDirection,
   SignHolderType,
+  SignSide,
   SignStatus,
   StandStatus,
-  SignSide,
 } from '@/types/annotations';
 
 // ---------------------------------------------------------------------------
@@ -24,25 +26,65 @@ export interface StandFilters {
   standType: SignHolderType | 'all';
 }
 
+export interface DesignFilters {
+  search: string;
+  status: DesignStatus | 'all';
+  signageType: string; // signageTypeName or 'all'
+}
+
 // ---------------------------------------------------------------------------
-// Row types (denormalised for table rendering)
+// Internal face type (one per physical sign face)
 // ---------------------------------------------------------------------------
 
-export interface SignRow {
-  /** Parent annotation id */
+interface FaceRecord {
   annotationId: string;
-  /** Which side of the pedestal: 1 or 2 */
   side: 1 | 2;
-  /** Display label, e.g. "My Sign (Side 1)" */
-  label: string;
   signageTypeName: string | undefined;
   signageSubTypeName: string | undefined;
-  status: SignStatus;
+  direction: SignDirection | undefined;
+  signStatus: SignStatus;
+  designStatus: DesignStatus;
   notes: string | undefined;
-  /** Reference to the parent annotation for updates */
   annotation: Annotation;
 }
 
+// ---------------------------------------------------------------------------
+// Row types (exposed for table rendering)
+// ---------------------------------------------------------------------------
+
+/** A face reference used for bulk updates. */
+export interface FaceRef {
+  annotationId: string;
+  side: 1 | 2;
+}
+
+/** Signs tab: grouped by (type, sub-type, direction). */
+export interface SignGroupRow {
+  /** Stable key for React rendering. */
+  key: string;
+  signageTypeName: string | undefined;
+  signageSubTypeName: string | undefined;
+  direction: SignDirection | undefined;
+  directionLabel: string | undefined;
+  quantity: number;
+  status: SignStatus;
+  notes: string | undefined;
+  faces: FaceRef[];
+}
+
+/** Designs tab: grouped identically to signs but with design-specific status. */
+export interface DesignRow {
+  key: string;
+  signageTypeName: string | undefined;
+  signageSubTypeName: string | undefined;
+  direction: SignDirection | undefined;
+  directionLabel: string | undefined;
+  designStatus: DesignStatus;
+  notes: string | undefined;
+  faces: FaceRef[];
+}
+
+/** Stands tab: one row per annotation (unchanged from before). */
 export interface StandRow {
   annotationId: string;
   label: string;
@@ -66,23 +108,30 @@ export interface StandStats {
   byStatus: Record<StandStatus, number>;
 }
 
+export interface DesignStats {
+  total: number;
+  byStatus: Record<DesignStatus, number>;
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
 function getEffectiveSignStatus(side: SignSide | undefined, annotation: Annotation): SignStatus {
-  // Per-side status takes priority, then fall back to legacy orderStatus mapping
   if (side?.signStatus) return side.signStatus;
   const legacy = annotation.orderStatus;
-  if (!legacy) return 'in_design';
-  // Map legacy OrderStatus → SignStatus (best-effort)
+  if (!legacy) return 'not_ordered';
   const map: Record<string, SignStatus> = {
-    not_ordered: 'in_design',
+    not_ordered: 'not_ordered',
     ordered: 'ordered',
     shipped: 'shipped',
     installed: 'installed',
   };
-  return map[legacy] ?? 'in_design';
+  return map[legacy] ?? 'not_ordered';
+}
+
+function getEffectiveDesignStatus(side: SignSide | undefined): DesignStatus {
+  return side?.designStatus ?? 'not_started';
 }
 
 function getEffectiveStandStatus(annotation: Annotation): StandStatus {
@@ -93,7 +142,7 @@ function getEffectiveStandStatus(annotation: Annotation): StandStatus {
     not_ordered: 'not_ordered',
     ordered: 'ordered',
     shipped: 'shipped',
-    installed: 'delivered', // best-effort: "installed" → "delivered" for stands
+    installed: 'delivered',
   };
   return map[legacy] ?? 'not_ordered';
 }
@@ -102,7 +151,6 @@ function getEffectiveHolder(annotation: Annotation): SignHolderType {
   return annotation.signHolder || DEFAULT_SIGN_HOLDER;
 }
 
-/** Resolve side-1 data, falling back to root-level fields for old annotations. */
 function getSide1Data(annotation: Annotation): SignSide | undefined {
   if (annotation.side1) {
     return {
@@ -136,6 +184,51 @@ function getDisplayLabel(annotation: Annotation): string {
   return 'Sign';
 }
 
+/** Build a stable group key from design-defining attributes. */
+function groupKey(
+  typeName: string | undefined,
+  subTypeName: string | undefined,
+  direction: SignDirection | undefined,
+  notes: string | undefined,
+): string {
+  return `${typeName ?? ''}||${subTypeName ?? ''}||${direction ?? ''}||${notes ?? ''}`;
+}
+
+// ---------------------------------------------------------------------------
+// Grouping helper
+// ---------------------------------------------------------------------------
+
+/**
+ * Groups face records by (type, sub-type, direction).
+ * Faces whose parent annotation has notes get their own row.
+ */
+function groupFaces<T>(
+  faces: FaceRecord[],
+  buildRow: (key: string, first: FaceRecord, faces: FaceRef[]) => T,
+): T[] {
+  const map = new Map<string, { first: FaceRecord; refs: FaceRef[] }>();
+
+  for (const f of faces) {
+    // Faces with annotation-level notes break out
+    const k = groupKey(f.signageTypeName, f.signageSubTypeName, f.direction, f.notes);
+    const existing = map.get(k);
+    if (existing) {
+      existing.refs.push({ annotationId: f.annotationId, side: f.side });
+    } else {
+      map.set(k, {
+        first: f,
+        refs: [{ annotationId: f.annotationId, side: f.side }],
+      });
+    }
+  }
+
+  const rows: T[] = [];
+  for (const [k, { first, refs }] of map) {
+    rows.push(buildRow(k, first, refs));
+  }
+  return rows;
+}
+
 // ---------------------------------------------------------------------------
 // Hook
 // ---------------------------------------------------------------------------
@@ -144,6 +237,7 @@ export function useAssetStats(
   annotations: Annotation[],
   signFilters: SignFilters,
   standFilters: StandFilters,
+  designFilters: DesignFilters,
 ) {
   // Filter to signage annotations only
   const signageAnnotations = useMemo(
@@ -152,49 +246,87 @@ export function useAssetStats(
   );
 
   // -----------------------------------------------------------------------
-  // Explode into sign rows (one per face)
+  // Explode into face records (one per physical sign face)
   // -----------------------------------------------------------------------
 
-  const allSignRows: SignRow[] = useMemo(() => {
-    const rows: SignRow[] = [];
+  const allFaces: FaceRecord[] = useMemo(() => {
+    const records: FaceRecord[] = [];
     for (const a of signageAnnotations) {
       const holder = getEffectiveHolder(a);
       const sides = holder === 'sign-pedestal-2' ? 2 : 1;
-      const baseLabel = getDisplayLabel(a);
 
-      // Side 1
       const s1 = getSide1Data(a);
-      rows.push({
+      records.push({
         annotationId: a.id,
         side: 1,
-        label: sides === 2 ? `${baseLabel} (Side 1)` : baseLabel,
         signageTypeName: s1?.signageTypeName,
         signageSubTypeName: s1?.signageSubTypeName,
-        status: getEffectiveSignStatus(s1, a),
+        direction: s1?.direction,
+        signStatus: getEffectiveSignStatus(s1, a),
+        designStatus: getEffectiveDesignStatus(s1),
         notes: a.notes,
         annotation: a,
       });
 
-      // Side 2 (only for 2-sided holders)
       if (sides === 2) {
         const s2 = a.side2;
-        rows.push({
+        records.push({
           annotationId: a.id,
           side: 2,
-          label: `${baseLabel} (Side 2)`,
           signageTypeName: s2?.signageTypeName,
           signageSubTypeName: s2?.signageSubTypeName,
-          status: getEffectiveSignStatus(s2, a),
+          direction: s2?.direction,
+          signStatus: getEffectiveSignStatus(s2, a),
+          designStatus: getEffectiveDesignStatus(s2),
           notes: a.notes,
           annotation: a,
         });
       }
     }
-    return rows;
+    return records;
   }, [signageAnnotations]);
 
   // -----------------------------------------------------------------------
-  // All stand rows (one per annotation)
+  // Grouped sign rows (Signs tab)
+  // -----------------------------------------------------------------------
+
+  const allSignGroupRows: SignGroupRow[] = useMemo(
+    () =>
+      groupFaces(allFaces, (key, first, faces) => ({
+        key,
+        signageTypeName: first.signageTypeName,
+        signageSubTypeName: first.signageSubTypeName,
+        direction: first.direction,
+        directionLabel: first.direction ? SIGN_DIRECTIONS[first.direction]?.label : undefined,
+        quantity: faces.length,
+        status: first.signStatus,
+        notes: first.notes,
+        faces,
+      })),
+    [allFaces],
+  );
+
+  // -----------------------------------------------------------------------
+  // Grouped design rows (Designs tab)
+  // -----------------------------------------------------------------------
+
+  const allDesignRows: DesignRow[] = useMemo(
+    () =>
+      groupFaces(allFaces, (key, first, faces) => ({
+        key,
+        signageTypeName: first.signageTypeName,
+        signageSubTypeName: first.signageSubTypeName,
+        direction: first.direction,
+        directionLabel: first.direction ? SIGN_DIRECTIONS[first.direction]?.label : undefined,
+        designStatus: first.designStatus,
+        notes: first.notes,
+        faces,
+      })),
+    [allFaces],
+  );
+
+  // -----------------------------------------------------------------------
+  // Stand rows (one per annotation — unchanged)
   // -----------------------------------------------------------------------
 
   const allStandRows: StandRow[] = useMemo(() => {
@@ -214,17 +346,30 @@ export function useAssetStats(
 
   const signStats: SignStats = useMemo(() => {
     const byStatus: Record<SignStatus, number> = {
-      in_design: 0,
+      not_ordered: 0,
       ordered: 0,
       shipped: 0,
       delivered: 0,
       installed: 0,
     };
-    for (const r of allSignRows) {
-      byStatus[r.status]++;
+    for (const r of allSignGroupRows) {
+      byStatus[r.status] += r.quantity;
     }
-    return { total: allSignRows.length, byStatus };
-  }, [allSignRows]);
+    const total = allSignGroupRows.reduce((sum, r) => sum + r.quantity, 0);
+    return { total, byStatus };
+  }, [allSignGroupRows]);
+
+  const designStats: DesignStats = useMemo(() => {
+    const byStatus: Record<DesignStatus, number> = {
+      not_started: 0,
+      in_design: 0,
+      completed: 0,
+    };
+    for (const r of allDesignRows) {
+      byStatus[r.designStatus]++;
+    }
+    return { total: allDesignRows.length, byStatus };
+  }, [allDesignRows]);
 
   const standStats: StandStats = useMemo(() => {
     const byStatus: Record<StandStatus, number> = {
@@ -240,29 +385,29 @@ export function useAssetStats(
   }, [allStandRows]);
 
   // -----------------------------------------------------------------------
-  // Signage type names for filter dropdowns (from sign rows)
+  // Signage type names for filter dropdowns
   // -----------------------------------------------------------------------
 
   const signageTypeNames = useMemo(() => {
     const names = new Set<string>();
-    for (const r of allSignRows) {
-      if (r.signageTypeName) names.add(r.signageTypeName);
+    for (const f of allFaces) {
+      if (f.signageTypeName) names.add(f.signageTypeName);
     }
     return Array.from(names).sort();
-  }, [allSignRows]);
+  }, [allFaces]);
 
   // -----------------------------------------------------------------------
-  // Filtered sign rows
+  // Filtered sign group rows
   // -----------------------------------------------------------------------
 
-  const filteredSignRows = useMemo(() => {
-    return allSignRows.filter((r) => {
+  const filteredSignGroupRows = useMemo(() => {
+    return allSignGroupRows.filter((r) => {
       if (signFilters.search) {
         const q = signFilters.search.toLowerCase();
         const matches =
-          r.label.toLowerCase().includes(q) ||
           r.signageTypeName?.toLowerCase().includes(q) ||
           r.signageSubTypeName?.toLowerCase().includes(q) ||
+          r.directionLabel?.toLowerCase().includes(q) ||
           r.notes?.toLowerCase().includes(q);
         if (!matches) return false;
       }
@@ -270,7 +415,28 @@ export function useAssetStats(
       if (signFilters.signageType !== 'all' && r.signageTypeName !== signFilters.signageType) return false;
       return true;
     });
-  }, [allSignRows, signFilters]);
+  }, [allSignGroupRows, signFilters]);
+
+  // -----------------------------------------------------------------------
+  // Filtered design rows
+  // -----------------------------------------------------------------------
+
+  const filteredDesignRows = useMemo(() => {
+    return allDesignRows.filter((r) => {
+      if (designFilters.search) {
+        const q = designFilters.search.toLowerCase();
+        const matches =
+          r.signageTypeName?.toLowerCase().includes(q) ||
+          r.signageSubTypeName?.toLowerCase().includes(q) ||
+          r.directionLabel?.toLowerCase().includes(q) ||
+          r.notes?.toLowerCase().includes(q);
+        if (!matches) return false;
+      }
+      if (designFilters.status !== 'all' && r.designStatus !== designFilters.status) return false;
+      if (designFilters.signageType !== 'all' && r.signageTypeName !== designFilters.signageType) return false;
+      return true;
+    });
+  }, [allDesignRows, designFilters]);
 
   // -----------------------------------------------------------------------
   // Filtered stand rows
@@ -294,8 +460,10 @@ export function useAssetStats(
   return {
     signStats,
     standStats,
+    designStats,
     signageTypeNames,
-    filteredSignRows,
+    filteredSignGroupRows,
+    filteredDesignRows,
     filteredStandRows,
     signageAnnotations,
   };
