@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
-import { ArrowUp, Info } from 'lucide-react';
+import { ArrowUp } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Select,
@@ -218,19 +217,11 @@ function SideDetails({
 
       {/* Direction Section */}
       <div className="space-y-2">
-        <div className="flex items-center gap-1">
+        <div>
           <Label className="text-xs text-muted-foreground">Direction</Label>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Info className="w-3.5 h-3.5 text-muted-foreground/70 cursor-help" />
-            </TooltipTrigger>
-            <TooltipContent side="top" className="max-w-[220px] text-center">
-              <p className="text-xs">
-                Direction is from the viewer's perspective in real life, not the map orientation. 
-                The arrow on the canvas may appear different from the actual direction.
-              </p>
-            </TooltipContent>
-          </Tooltip>
+          <p className="text-[11px] text-muted-foreground/70 mt-0.5 leading-snug">
+            Direction is from the viewer&apos;s perspective in real life, not the map orientation. The arrow on the canvas may appear different from the actual direction.
+          </p>
         </div>
         <DirectionSelector
           value={sideData?.direction}

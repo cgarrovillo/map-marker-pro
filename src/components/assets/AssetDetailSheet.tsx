@@ -20,19 +20,23 @@ import { AssetStatusBadge } from './AssetStatusBadge';
 import {
   SIGN_HOLDERS,
   DEFAULT_SIGN_HOLDER,
-  ORDER_STATUSES,
+  SIGN_STATUSES,
+  STAND_STATUSES,
 } from '@/types/annotations';
 import type {
   Annotation,
-  OrderStatus,
   SignHolderType,
   SignSide,
+  SignStatus,
+  StandStatus,
 } from '@/types/annotations';
 import { Tables } from '@/integrations/supabase/types';
 import { Calendar, ImageIcon, StickyNote } from 'lucide-react';
 
 type SignageTypeRow = Tables<'signage_types'>;
 type SignageSubTypeRow = Tables<'signage_sub_types'>;
+
+export type DetailSheetMode = 'sign' | 'stand';
 
 interface AssetDetailSheetProps {
   annotation: Annotation | null;
@@ -41,6 +45,7 @@ interface AssetDetailSheetProps {
   onUpdateAnnotation: (id: string, updates: Partial<Annotation>) => Promise<void>;
   signageTypes?: SignageTypeRow[];
   subTypesByParent?: Record<string, SignageSubTypeRow[]>;
+  mode: DetailSheetMode;
 }
 
 function formatSideType(side: SignSide | undefined): string | null {
@@ -73,33 +78,58 @@ function getDisplayLabel(annotation: Annotation): string {
   if (s1 && s2) return `${s1} | ${s2}`;
   if (s1) return s1;
   if (s2) return s2;
-  return 'Signage Annotation';
+  return 'Sign';
 }
 
-/**
- * Resolve the image URL for a given side by walking the type hierarchy:
- * sub-type image_url  ->  parent type image_url  ->  undefined
- */
 function resolveSignImage(
   sideData: SignSide | undefined,
   signageTypes: SignageTypeRow[],
   subTypesByParent: Record<string, SignageSubTypeRow[]>,
 ): string | undefined {
   if (!sideData?.signageTypeName) return undefined;
-
   const parentType = signageTypes.find((t) => t.name === sideData.signageTypeName);
   if (!parentType) return undefined;
-
-  // Check sub-type first
   if (sideData.signageSubTypeName) {
     const subTypes = subTypesByParent[parentType.id] || [];
     const subType = subTypes.find((st) => st.name === sideData.signageSubTypeName);
     if (subType?.image_url) return subType.image_url;
   }
-
-  // Fall back to parent type
   return parentType.image_url ?? undefined;
 }
+
+// ---------------------------------------------------------------------------
+// Effective status helpers
+// ---------------------------------------------------------------------------
+
+function getEffectiveSignStatus(side: SignSide | undefined, annotation: Annotation): SignStatus {
+  if (side?.signStatus) return side.signStatus;
+  const legacy = annotation.orderStatus;
+  if (!legacy) return 'in_design';
+  const map: Record<string, SignStatus> = {
+    not_ordered: 'in_design',
+    ordered: 'ordered',
+    shipped: 'shipped',
+    installed: 'installed',
+  };
+  return map[legacy] ?? 'in_design';
+}
+
+function getEffectiveStandStatus(annotation: Annotation): StandStatus {
+  if (annotation.standStatus) return annotation.standStatus;
+  const legacy = annotation.orderStatus;
+  if (!legacy) return 'not_ordered';
+  const map: Record<string, StandStatus> = {
+    not_ordered: 'not_ordered',
+    ordered: 'ordered',
+    shipped: 'shipped',
+    installed: 'delivered',
+  };
+  return map[legacy] ?? 'not_ordered';
+}
+
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
 
 export function AssetDetailSheet({
   annotation,
@@ -108,10 +138,10 @@ export function AssetDetailSheet({
   onUpdateAnnotation,
   signageTypes = [],
   subTypesByParent = {},
+  mode,
 }: AssetDetailSheetProps) {
   const [notes, setNotes] = useState('');
 
-  // Sync local state when annotation changes
   useEffect(() => {
     if (annotation) {
       setNotes(annotation.notes ?? '');
@@ -120,7 +150,6 @@ export function AssetDetailSheet({
 
   if (!annotation) return null;
 
-  const effectiveStatus: OrderStatus = annotation.orderStatus ?? 'not_ordered';
   const effectiveHolder: SignHolderType = annotation.signHolder || DEFAULT_SIGN_HOLDER;
 
   const handleNotesBlur = () => {
@@ -129,22 +158,11 @@ export function AssetDetailSheet({
     }
   };
 
-  const handleStatusChange = (value: string) => {
-    onUpdateAnnotation(annotation.id, { orderStatus: value as OrderStatus });
-  };
-
-  const handleHolderChange = (value: string) => {
-    onUpdateAnnotation(annotation.id, {
-      signHolder: value as SignHolderType,
-    });
-  };
-
   const createdDate = new Date(annotation.createdAt).toLocaleDateString(
     undefined,
-    { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }
+    { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' },
   );
 
-  // Resolve images from the type hierarchy
   const side1 = getSide1Data(annotation);
   const side2 = annotation.side2;
   const side1ImageUrl = resolveSignImage(side1, signageTypes, subTypesByParent);
@@ -156,7 +174,9 @@ export function AssetDetailSheet({
         <SheetHeader>
           <SheetTitle>{getDisplayLabel(annotation)}</SheetTitle>
           <SheetDescription>
-            Edit details for this specific sign placement
+            {mode === 'sign'
+              ? 'View and edit sign face details'
+              : 'View and edit stand details'}
           </SheetDescription>
         </SheetHeader>
 
@@ -167,7 +187,7 @@ export function AssetDetailSheet({
             <span>Placed {createdDate}</span>
           </div>
 
-          {/* Parent signage type notes (show for both sides' parent types if they differ) */}
+          {/* Parent signage type notes */}
           {(() => {
             const parentNames = new Set<string>();
             if (side1?.signageTypeName) parentNames.add(side1.signageTypeName);
@@ -188,14 +208,14 @@ export function AssetDetailSheet({
                     <p className="text-sm text-muted-foreground bg-secondary/50 rounded-md px-3 py-2 whitespace-pre-wrap">
                       {parentType.notes}
                     </p>
-                  </div>
+                  </div>,
                 );
               }
             });
             return noteBlocks.length > 0 ? <>{noteBlocks}</> : null;
           })()}
 
-          {/* Sign side previews with type labels + images */}
+          {/* Sign side previews — shown in both modes for context */}
           {(() => {
             const s1Type = formatSideType(side1);
             const s2Type = formatSideType(side2);
@@ -258,48 +278,129 @@ export function AssetDetailSheet({
 
           <Separator />
 
-          {/* Editable fields */}
+          {/* Editable fields — differ by mode */}
           <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Holder Type</Label>
-              <Select
-                value={effectiveHolder}
-                onValueChange={handleHolderChange}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select holder type" />
-                </SelectTrigger>
-                <SelectContent>
-                  {(Object.keys(SIGN_HOLDERS) as SignHolderType[]).map(
-                    (holder) => (
-                      <SelectItem key={holder} value={holder}>
-                        {SIGN_HOLDERS[holder].label}
-                      </SelectItem>
-                    )
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
+            {mode === 'stand' && (
+              <>
+                <div className="space-y-2">
+                  <Label>Stand Type</Label>
+                  <Select
+                    value={effectiveHolder}
+                    onValueChange={(value) =>
+                      onUpdateAnnotation(annotation.id, {
+                        signHolder: value as SignHolderType,
+                      })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select stand type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(Object.keys(SIGN_HOLDERS) as SignHolderType[]).map(
+                        (holder) => (
+                          <SelectItem key={holder} value={holder}>
+                            {SIGN_HOLDERS[holder].label}
+                          </SelectItem>
+                        ),
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-            <div className="space-y-2">
-              <Label>Order Status</Label>
-              <Select value={effectiveStatus} onValueChange={handleStatusChange}>
-                <SelectTrigger>
-                  <SelectValue>
-                    <AssetStatusBadge status={effectiveStatus} />
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {(Object.keys(ORDER_STATUSES) as OrderStatus[]).map(
-                    (status) => (
-                      <SelectItem key={status} value={status}>
-                        <AssetStatusBadge status={status} />
-                      </SelectItem>
-                    )
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
+                <div className="space-y-2">
+                  <Label>Stand Status</Label>
+                  <Select
+                    value={getEffectiveStandStatus(annotation)}
+                    onValueChange={(value) =>
+                      onUpdateAnnotation(annotation.id, {
+                        standStatus: value as StandStatus,
+                      })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue>
+                        <AssetStatusBadge status={getEffectiveStandStatus(annotation)} />
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(Object.keys(STAND_STATUSES) as StandStatus[]).map(
+                        (status) => (
+                          <SelectItem key={status} value={status}>
+                            <AssetStatusBadge status={status} />
+                          </SelectItem>
+                        ),
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </>
+            )}
+
+            {mode === 'sign' && (
+              <>
+                {/* Side 1 status */}
+                <div className="space-y-2">
+                  <Label>Side 1 Status</Label>
+                  <Select
+                    value={getEffectiveSignStatus(side1, annotation)}
+                    onValueChange={(value) => {
+                      const current = annotation.side1 ?? {};
+                      onUpdateAnnotation(annotation.id, {
+                        side1: { ...current, signStatus: value as SignStatus },
+                      });
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue>
+                        <AssetStatusBadge status={getEffectiveSignStatus(side1, annotation)} />
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(Object.keys(SIGN_STATUSES) as SignStatus[]).map(
+                        (status) => (
+                          <SelectItem key={status} value={status}>
+                            <AssetStatusBadge status={status} />
+                          </SelectItem>
+                        ),
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Side 2 status (only for 2-sided) */}
+                {effectiveHolder === 'sign-pedestal-2' && (
+                  <div className="space-y-2">
+                    <Label>Side 2 Status</Label>
+                    <Select
+                      value={getEffectiveSignStatus(annotation.side2, annotation)}
+                      onValueChange={(value) => {
+                        const current = annotation.side2 ?? {};
+                        onUpdateAnnotation(annotation.id, {
+                          side2: { ...current, signStatus: value as SignStatus },
+                        });
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue>
+                          <AssetStatusBadge
+                            status={getEffectiveSignStatus(annotation.side2, annotation)}
+                          />
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(Object.keys(SIGN_STATUSES) as SignStatus[]).map(
+                          (status) => (
+                            <SelectItem key={status} value={status}>
+                              <AssetStatusBadge status={status} />
+                            </SelectItem>
+                          ),
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="asset-notes">Placement Notes</Label>

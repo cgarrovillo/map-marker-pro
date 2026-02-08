@@ -1,17 +1,113 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Package, ShoppingCart, Truck, CheckCircle, CircleDashed, Columns2 } from 'lucide-react';
-import type { AssetStats } from '@/hooks/useAssetStats';
+import {
+  Package,
+  ShoppingCart,
+  Truck,
+  CheckCircle,
+  CircleDashed,
+  Pen,
+  PackageCheck,
+} from 'lucide-react';
+import type { SignStats, StandStats } from '@/hooks/useAssetStats';
 
-interface AssetSummaryCardsProps {
-  stats: AssetStats;
+// ---------------------------------------------------------------------------
+// Signs
+// ---------------------------------------------------------------------------
+
+interface SignSummaryCardsProps {
+  stats: SignStats;
 }
 
-export function AssetSummaryCards({ stats }: AssetSummaryCardsProps) {
+export function SignSummaryCards({ stats }: SignSummaryCardsProps) {
   return (
     <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">Total Signs</CardTitle>
+          <Package className="h-4 w-4 text-muted-foreground" />
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold">{stats.total}</div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">In Design</CardTitle>
+          <Pen className="h-4 w-4 text-purple-500" />
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold text-purple-500">
+            {stats.byStatus.in_design}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Ordered</CardTitle>
+          <ShoppingCart className="h-4 w-4 text-blue-500" />
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold text-blue-500">
+            {stats.byStatus.ordered}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Shipped</CardTitle>
+          <Truck className="h-4 w-4 text-amber-500" />
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold text-amber-500">
+            {stats.byStatus.shipped}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Delivered</CardTitle>
+          <PackageCheck className="h-4 w-4 text-teal-500" />
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold text-teal-500">
+            {stats.byStatus.delivered}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Installed</CardTitle>
+          <CheckCircle className="h-4 w-4 text-green-500" />
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold text-green-500">
+            {stats.byStatus.installed}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Stands
+// ---------------------------------------------------------------------------
+
+interface StandSummaryCardsProps {
+  stats: StandStats;
+}
+
+export function StandSummaryCards({ stats }: StandSummaryCardsProps) {
+  return (
+    <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Total Stands</CardTitle>
           <Package className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
@@ -35,7 +131,9 @@ export function AssetSummaryCards({ stats }: AssetSummaryCardsProps) {
           <ShoppingCart className="h-4 w-4 text-blue-500" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold text-blue-500">{stats.byStatus.ordered}</div>
+          <div className="text-2xl font-bold text-blue-500">
+            {stats.byStatus.ordered}
+          </div>
         </CardContent>
       </Card>
 
@@ -45,35 +143,20 @@ export function AssetSummaryCards({ stats }: AssetSummaryCardsProps) {
           <Truck className="h-4 w-4 text-amber-500" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold text-amber-500">{stats.byStatus.shipped}</div>
+          <div className="text-2xl font-bold text-amber-500">
+            {stats.byStatus.shipped}
+          </div>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Installed</CardTitle>
-          <CheckCircle className="h-4 w-4 text-green-500" />
+          <CardTitle className="text-sm font-medium">Delivered</CardTitle>
+          <PackageCheck className="h-4 w-4 text-teal-500" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold text-green-500">{stats.byStatus.installed}</div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Pedestals</CardTitle>
-          <Columns2 className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-sm space-y-1">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">1-sided</span>
-              <span className="font-semibold">{stats.byHolder['sign-pedestal-1']}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">2-sided</span>
-              <span className="font-semibold">{stats.byHolder['sign-pedestal-2']}</span>
-            </div>
+          <div className="text-2xl font-bold text-teal-500">
+            {stats.byStatus.delivered}
           </div>
         </CardContent>
       </Card>

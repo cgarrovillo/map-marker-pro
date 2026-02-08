@@ -1,130 +1,302 @@
 import { useMemo } from 'react';
 import { DEFAULT_SIGN_HOLDER } from '@/types/annotations';
-import type { Annotation, OrderStatus, SignHolderType } from '@/types/annotations';
+import type {
+  Annotation,
+  SignHolderType,
+  SignStatus,
+  StandStatus,
+  SignSide,
+} from '@/types/annotations';
 
-export interface AssetFilters {
+// ---------------------------------------------------------------------------
+// Filter types
+// ---------------------------------------------------------------------------
+
+export interface SignFilters {
   search: string;
-  status: OrderStatus | 'all';
+  status: SignStatus | 'all';
   signageType: string; // signageTypeName or 'all'
-  holderType: SignHolderType | 'all';
 }
 
-export interface AssetStats {
+export interface StandFilters {
+  search: string;
+  status: StandStatus | 'all';
+  standType: SignHolderType | 'all';
+}
+
+// ---------------------------------------------------------------------------
+// Row types (denormalised for table rendering)
+// ---------------------------------------------------------------------------
+
+export interface SignRow {
+  /** Parent annotation id */
+  annotationId: string;
+  /** Which side of the pedestal: 1 or 2 */
+  side: 1 | 2;
+  /** Display label, e.g. "My Sign (Side 1)" */
+  label: string;
+  signageTypeName: string | undefined;
+  signageSubTypeName: string | undefined;
+  status: SignStatus;
+  notes: string | undefined;
+  /** Reference to the parent annotation for updates */
+  annotation: Annotation;
+}
+
+export interface StandRow {
+  annotationId: string;
+  label: string;
+  holderType: SignHolderType;
+  status: StandStatus;
+  notes: string | undefined;
+  annotation: Annotation;
+}
+
+// ---------------------------------------------------------------------------
+// Stats types
+// ---------------------------------------------------------------------------
+
+export interface SignStats {
   total: number;
-  byStatus: Record<OrderStatus, number>;
-  byHolder: Record<SignHolderType, number>;
+  byStatus: Record<SignStatus, number>;
 }
 
-function getEffectiveStatus(annotation: Annotation): OrderStatus {
-  return annotation.orderStatus ?? 'not_ordered';
+export interface StandStats {
+  total: number;
+  byStatus: Record<StandStatus, number>;
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function getEffectiveSignStatus(side: SignSide | undefined, annotation: Annotation): SignStatus {
+  // Per-side status takes priority, then fall back to legacy orderStatus mapping
+  if (side?.signStatus) return side.signStatus;
+  const legacy = annotation.orderStatus;
+  if (!legacy) return 'in_design';
+  // Map legacy OrderStatus → SignStatus (best-effort)
+  const map: Record<string, SignStatus> = {
+    not_ordered: 'in_design',
+    ordered: 'ordered',
+    shipped: 'shipped',
+    installed: 'installed',
+  };
+  return map[legacy] ?? 'in_design';
+}
+
+function getEffectiveStandStatus(annotation: Annotation): StandStatus {
+  if (annotation.standStatus) return annotation.standStatus;
+  const legacy = annotation.orderStatus;
+  if (!legacy) return 'not_ordered';
+  const map: Record<string, StandStatus> = {
+    not_ordered: 'not_ordered',
+    ordered: 'ordered',
+    shipped: 'shipped',
+    installed: 'delivered', // best-effort: "installed" → "delivered" for stands
+  };
+  return map[legacy] ?? 'not_ordered';
 }
 
 function getEffectiveHolder(annotation: Annotation): SignHolderType {
   return annotation.signHolder || DEFAULT_SIGN_HOLDER;
 }
 
-export function useAssetStats(annotations: Annotation[], filters: AssetFilters) {
+/** Resolve side-1 data, falling back to root-level fields for old annotations. */
+function getSide1Data(annotation: Annotation): SignSide | undefined {
+  if (annotation.side1) {
+    return {
+      ...annotation.side1,
+      signageTypeName: annotation.side1.signageTypeName ?? annotation.signageTypeName,
+      signageSubTypeName: annotation.side1.signageSubTypeName ?? annotation.signageSubTypeName,
+    };
+  }
+  if (annotation.signageTypeName) {
+    return {
+      signageTypeName: annotation.signageTypeName,
+      signageSubTypeName: annotation.signageSubTypeName,
+    };
+  }
+  return undefined;
+}
+
+function formatSideType(side: SignSide | undefined): string | null {
+  if (!side?.signageTypeName) return null;
+  if (side.signageSubTypeName) return `${side.signageTypeName} / ${side.signageSubTypeName}`;
+  return side.signageTypeName;
+}
+
+function getDisplayLabel(annotation: Annotation): string {
+  if (annotation.label) return annotation.label;
+  const s1 = formatSideType(getSide1Data(annotation));
+  const s2 = formatSideType(annotation.side2);
+  if (s1 && s2) return `${s1} | ${s2}`;
+  if (s1) return s1;
+  if (s2) return s2;
+  return 'Sign';
+}
+
+// ---------------------------------------------------------------------------
+// Hook
+// ---------------------------------------------------------------------------
+
+export function useAssetStats(
+  annotations: Annotation[],
+  signFilters: SignFilters,
+  standFilters: StandFilters,
+) {
   // Filter to signage annotations only
   const signageAnnotations = useMemo(
     () => annotations.filter((a) => a.category === 'signage'),
-    [annotations]
+    [annotations],
   );
 
-  // Compute stats from all signage annotations (unfiltered)
-  const stats: AssetStats = useMemo(() => {
-    const byStatus: Record<OrderStatus, number> = {
+  // -----------------------------------------------------------------------
+  // Explode into sign rows (one per face)
+  // -----------------------------------------------------------------------
+
+  const allSignRows: SignRow[] = useMemo(() => {
+    const rows: SignRow[] = [];
+    for (const a of signageAnnotations) {
+      const holder = getEffectiveHolder(a);
+      const sides = holder === 'sign-pedestal-2' ? 2 : 1;
+      const baseLabel = getDisplayLabel(a);
+
+      // Side 1
+      const s1 = getSide1Data(a);
+      rows.push({
+        annotationId: a.id,
+        side: 1,
+        label: sides === 2 ? `${baseLabel} (Side 1)` : baseLabel,
+        signageTypeName: s1?.signageTypeName,
+        signageSubTypeName: s1?.signageSubTypeName,
+        status: getEffectiveSignStatus(s1, a),
+        notes: a.notes,
+        annotation: a,
+      });
+
+      // Side 2 (only for 2-sided holders)
+      if (sides === 2) {
+        const s2 = a.side2;
+        rows.push({
+          annotationId: a.id,
+          side: 2,
+          label: `${baseLabel} (Side 2)`,
+          signageTypeName: s2?.signageTypeName,
+          signageSubTypeName: s2?.signageSubTypeName,
+          status: getEffectiveSignStatus(s2, a),
+          notes: a.notes,
+          annotation: a,
+        });
+      }
+    }
+    return rows;
+  }, [signageAnnotations]);
+
+  // -----------------------------------------------------------------------
+  // All stand rows (one per annotation)
+  // -----------------------------------------------------------------------
+
+  const allStandRows: StandRow[] = useMemo(() => {
+    return signageAnnotations.map((a) => ({
+      annotationId: a.id,
+      label: getDisplayLabel(a),
+      holderType: getEffectiveHolder(a),
+      status: getEffectiveStandStatus(a),
+      notes: a.notes,
+      annotation: a,
+    }));
+  }, [signageAnnotations]);
+
+  // -----------------------------------------------------------------------
+  // Stats (unfiltered)
+  // -----------------------------------------------------------------------
+
+  const signStats: SignStats = useMemo(() => {
+    const byStatus: Record<SignStatus, number> = {
+      in_design: 0,
+      ordered: 0,
+      shipped: 0,
+      delivered: 0,
+      installed: 0,
+    };
+    for (const r of allSignRows) {
+      byStatus[r.status]++;
+    }
+    return { total: allSignRows.length, byStatus };
+  }, [allSignRows]);
+
+  const standStats: StandStats = useMemo(() => {
+    const byStatus: Record<StandStatus, number> = {
       not_ordered: 0,
       ordered: 0,
       shipped: 0,
-      installed: 0,
+      delivered: 0,
     };
-    const byHolder: Record<SignHolderType, number> = {
-      'sign-pedestal-1': 0,
-      'sign-pedestal-2': 0,
-    };
-
-    for (const a of signageAnnotations) {
-      byStatus[getEffectiveStatus(a)]++;
-      byHolder[getEffectiveHolder(a)]++;
+    for (const r of allStandRows) {
+      byStatus[r.status]++;
     }
+    return { total: allStandRows.length, byStatus };
+  }, [allStandRows]);
 
-    return {
-      total: signageAnnotations.length,
-      byStatus,
-      byHolder,
-    };
-  }, [signageAnnotations]);
+  // -----------------------------------------------------------------------
+  // Signage type names for filter dropdowns (from sign rows)
+  // -----------------------------------------------------------------------
 
-  // Collect all type names that appear on either side of an annotation
-  function getAnnotationTypeNames(a: Annotation): string[] {
-    const names: string[] = [];
-    // Side 1: prefer side1-level, fall back to root-level
-    const s1Name = a.side1?.signageTypeName ?? a.signageTypeName;
-    if (s1Name) names.push(s1Name);
-    // Side 2: only side2-level
-    if (a.side2?.signageTypeName) names.push(a.side2.signageTypeName);
-    return names;
-  }
-
-  // Get unique signage type names for filter options (from both sides)
   const signageTypeNames = useMemo(() => {
     const names = new Set<string>();
-    for (const a of signageAnnotations) {
-      for (const n of getAnnotationTypeNames(a)) {
-        names.add(n);
-      }
+    for (const r of allSignRows) {
+      if (r.signageTypeName) names.add(r.signageTypeName);
     }
     return Array.from(names).sort();
-  }, [signageAnnotations]);
+  }, [allSignRows]);
 
-  // Apply filters
-  const filteredAnnotations = useMemo(() => {
-    return signageAnnotations.filter((a) => {
-      // Search filter — match against both sides' types in addition to root fields
-      if (filters.search) {
-        const query = filters.search.toLowerCase();
-        const matchesLabel = a.label?.toLowerCase().includes(query);
-        const matchesNotes = a.notes?.toLowerCase().includes(query);
-        const matchesRootType = a.signageTypeName?.toLowerCase().includes(query);
-        const matchesRootSubType = a.signageSubTypeName?.toLowerCase().includes(query);
-        const matchesSide1Type = a.side1?.signageTypeName?.toLowerCase().includes(query);
-        const matchesSide1SubType = a.side1?.signageSubTypeName?.toLowerCase().includes(query);
-        const matchesSide2Type = a.side2?.signageTypeName?.toLowerCase().includes(query);
-        const matchesSide2SubType = a.side2?.signageSubTypeName?.toLowerCase().includes(query);
-        if (
-          !matchesLabel && !matchesNotes &&
-          !matchesRootType && !matchesRootSubType &&
-          !matchesSide1Type && !matchesSide1SubType &&
-          !matchesSide2Type && !matchesSide2SubType
-        ) {
-          return false;
-        }
+  // -----------------------------------------------------------------------
+  // Filtered sign rows
+  // -----------------------------------------------------------------------
+
+  const filteredSignRows = useMemo(() => {
+    return allSignRows.filter((r) => {
+      if (signFilters.search) {
+        const q = signFilters.search.toLowerCase();
+        const matches =
+          r.label.toLowerCase().includes(q) ||
+          r.signageTypeName?.toLowerCase().includes(q) ||
+          r.signageSubTypeName?.toLowerCase().includes(q) ||
+          r.notes?.toLowerCase().includes(q);
+        if (!matches) return false;
       }
-
-      // Status filter
-      if (filters.status !== 'all') {
-        if (getEffectiveStatus(a) !== filters.status) return false;
-      }
-
-      // Signage type filter — match if EITHER side has the filtered type
-      if (filters.signageType !== 'all') {
-        const typeNames = getAnnotationTypeNames(a);
-        if (!typeNames.includes(filters.signageType)) return false;
-      }
-
-      // Holder type filter
-      if (filters.holderType !== 'all') {
-        if (a.signHolder !== filters.holderType) return false;
-      }
-
+      if (signFilters.status !== 'all' && r.status !== signFilters.status) return false;
+      if (signFilters.signageType !== 'all' && r.signageTypeName !== signFilters.signageType) return false;
       return true;
     });
-  }, [signageAnnotations, filters]);
+  }, [allSignRows, signFilters]);
+
+  // -----------------------------------------------------------------------
+  // Filtered stand rows
+  // -----------------------------------------------------------------------
+
+  const filteredStandRows = useMemo(() => {
+    return allStandRows.filter((r) => {
+      if (standFilters.search) {
+        const q = standFilters.search.toLowerCase();
+        const matches =
+          r.label.toLowerCase().includes(q) ||
+          r.notes?.toLowerCase().includes(q);
+        if (!matches) return false;
+      }
+      if (standFilters.status !== 'all' && r.status !== standFilters.status) return false;
+      if (standFilters.standType !== 'all' && r.holderType !== standFilters.standType) return false;
+      return true;
+    });
+  }, [allStandRows, standFilters]);
 
   return {
-    stats,
+    signStats,
+    standStats,
     signageTypeNames,
-    filteredAnnotations,
+    filteredSignRows,
+    filteredStandRows,
     signageAnnotations,
   };
 }

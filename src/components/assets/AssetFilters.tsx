@@ -8,33 +8,45 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Search, X } from 'lucide-react';
-import { ORDER_STATUSES, SIGN_HOLDERS } from '@/types/annotations';
-import type { AssetFilters as AssetFiltersType } from '@/hooks/useAssetStats';
-import type { OrderStatus, SignHolderType } from '@/types/annotations';
+import { SIGN_STATUSES, STAND_STATUSES, SIGN_HOLDERS } from '@/types/annotations';
+import type { SignStatus, StandStatus, SignHolderType } from '@/types/annotations';
+import type { SignFilters, StandFilters } from '@/hooks/useAssetStats';
 
-interface AssetFiltersProps {
-  filters: AssetFiltersType;
-  onFiltersChange: (filters: AssetFiltersType) => void;
-  signageTypeNames: string[];
-}
+// ---------------------------------------------------------------------------
+// Defaults
+// ---------------------------------------------------------------------------
 
-const defaultFilters: AssetFiltersType = {
+export const defaultSignFilters: SignFilters = {
   search: '',
   status: 'all',
   signageType: 'all',
-  holderType: 'all',
 };
 
-function hasActiveFilters(filters: AssetFiltersType): boolean {
+export const defaultStandFilters: StandFilters = {
+  search: '',
+  status: 'all',
+  standType: 'all',
+};
+
+// ---------------------------------------------------------------------------
+// Sign Filters
+// ---------------------------------------------------------------------------
+
+interface SignFiltersProps {
+  filters: SignFilters;
+  onFiltersChange: (filters: SignFilters) => void;
+  signageTypeNames: string[];
+}
+
+function hasActiveSignFilters(filters: SignFilters): boolean {
   return (
     filters.search !== '' ||
     filters.status !== 'all' ||
-    filters.signageType !== 'all' ||
-    filters.holderType !== 'all'
+    filters.signageType !== 'all'
   );
 }
 
-export function AssetFilters({ filters, onFiltersChange, signageTypeNames }: AssetFiltersProps) {
+export function SignFilterBar({ filters, onFiltersChange, signageTypeNames }: SignFiltersProps) {
   return (
     <div className="flex flex-wrap items-center gap-3">
       <div className="relative flex-1 min-w-[200px] max-w-sm">
@@ -52,7 +64,7 @@ export function AssetFilters({ filters, onFiltersChange, signageTypeNames }: Ass
       <Select
         value={filters.status}
         onValueChange={(value) =>
-          onFiltersChange({ ...filters, status: value as OrderStatus | 'all' })
+          onFiltersChange({ ...filters, status: value as SignStatus | 'all' })
         }
       >
         <SelectTrigger className="w-[160px]">
@@ -60,9 +72,9 @@ export function AssetFilters({ filters, onFiltersChange, signageTypeNames }: Ass
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="all">All Statuses</SelectItem>
-          {(Object.keys(ORDER_STATUSES) as OrderStatus[]).map((status) => (
+          {(Object.keys(SIGN_STATUSES) as SignStatus[]).map((status) => (
             <SelectItem key={status} value={status}>
-              {ORDER_STATUSES[status].label}
+              {SIGN_STATUSES[status].label}
             </SelectItem>
           ))}
         </SelectContent>
@@ -87,30 +99,11 @@ export function AssetFilters({ filters, onFiltersChange, signageTypeNames }: Ass
         </SelectContent>
       </Select>
 
-      <Select
-        value={filters.holderType}
-        onValueChange={(value) =>
-          onFiltersChange({ ...filters, holderType: value as SignHolderType | 'all' })
-        }
-      >
-        <SelectTrigger className="w-[160px]">
-          <SelectValue placeholder="Holder Type" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">All Holders</SelectItem>
-          {(Object.keys(SIGN_HOLDERS) as SignHolderType[]).map((holder) => (
-            <SelectItem key={holder} value={holder}>
-              {SIGN_HOLDERS[holder].label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-
-      {hasActiveFilters(filters) && (
+      {hasActiveSignFilters(filters) && (
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => onFiltersChange(defaultFilters)}
+          onClick={() => onFiltersChange(defaultSignFilters)}
           className="text-muted-foreground"
         >
           <X className="h-4 w-4 mr-1" />
@@ -121,4 +114,87 @@ export function AssetFilters({ filters, onFiltersChange, signageTypeNames }: Ass
   );
 }
 
-export { defaultFilters };
+// ---------------------------------------------------------------------------
+// Stand Filters
+// ---------------------------------------------------------------------------
+
+interface StandFiltersProps {
+  filters: StandFilters;
+  onFiltersChange: (filters: StandFilters) => void;
+}
+
+function hasActiveStandFilters(filters: StandFilters): boolean {
+  return (
+    filters.search !== '' ||
+    filters.status !== 'all' ||
+    filters.standType !== 'all'
+  );
+}
+
+export function StandFilterBar({ filters, onFiltersChange }: StandFiltersProps) {
+  return (
+    <div className="flex flex-wrap items-center gap-3">
+      <div className="relative flex-1 min-w-[200px] max-w-sm">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Search by label or notes..."
+          value={filters.search}
+          onChange={(e) =>
+            onFiltersChange({ ...filters, search: e.target.value })
+          }
+          className="pl-9"
+        />
+      </div>
+
+      <Select
+        value={filters.status}
+        onValueChange={(value) =>
+          onFiltersChange({ ...filters, status: value as StandStatus | 'all' })
+        }
+      >
+        <SelectTrigger className="w-[160px]">
+          <SelectValue placeholder="Status" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">All Statuses</SelectItem>
+          {(Object.keys(STAND_STATUSES) as StandStatus[]).map((status) => (
+            <SelectItem key={status} value={status}>
+              {STAND_STATUSES[status].label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      <Select
+        value={filters.standType}
+        onValueChange={(value) =>
+          onFiltersChange({ ...filters, standType: value as SignHolderType | 'all' })
+        }
+      >
+        <SelectTrigger className="w-[160px]">
+          <SelectValue placeholder="Stand Type" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">All Stands</SelectItem>
+          {(Object.keys(SIGN_HOLDERS) as SignHolderType[]).map((holder) => (
+            <SelectItem key={holder} value={holder}>
+              {SIGN_HOLDERS[holder].label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      {hasActiveStandFilters(filters) && (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => onFiltersChange(defaultStandFilters)}
+          className="text-muted-foreground"
+        >
+          <X className="h-4 w-4 mr-1" />
+          Clear
+        </Button>
+      )}
+    </div>
+  );
+}

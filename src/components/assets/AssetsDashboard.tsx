@@ -1,12 +1,13 @@
 import { useState } from 'react';
-import { AssetSummaryCards } from './AssetSummaryCards';
-import { AssetFilters, defaultFilters } from './AssetFilters';
-import { AssetTable } from './AssetTable';
+import { SignSummaryCards, StandSummaryCards } from './AssetSummaryCards';
+import { SignFilterBar, StandFilterBar, defaultSignFilters, defaultStandFilters } from './AssetFilters';
+import { SignTable, StandTable } from './AssetTable';
 import { useAssetStats } from '@/hooks/useAssetStats';
+import type { SignFilters, StandFilters } from '@/hooks/useAssetStats';
 import { Package } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { Annotation } from '@/types/annotations';
-import type { AssetFilters as AssetFiltersType } from '@/hooks/useAssetStats';
 import type { Tables } from '@/integrations/supabase/types';
 
 type SignageTypeRow = Tables<'signage_types'>;
@@ -29,12 +30,16 @@ export function AssetsDashboard({
   signageTypes = [],
   subTypesByParent = {},
 }: AssetsDashboardProps) {
-  const [filters, setFilters] = useState<AssetFiltersType>(defaultFilters);
+  const [signFilters, setSignFilters] = useState<SignFilters>(defaultSignFilters);
+  const [standFilters, setStandFilters] = useState<StandFilters>(defaultStandFilters);
 
-  const { stats, signageTypeNames, filteredAnnotations } = useAssetStats(
-    annotations,
-    filters
-  );
+  const {
+    signStats,
+    standStats,
+    signageTypeNames,
+    filteredSignRows,
+    filteredStandRows,
+  } = useAssetStats(annotations, signFilters, standFilters);
 
   if (!activeEvent || !activeLayout) {
     return (
@@ -71,20 +76,47 @@ export function AssetsDashboard({
           </p>
         </div>
 
-        <AssetSummaryCards stats={stats} />
+        <Tabs defaultValue="signs" className="space-y-6">
+          <TabsList>
+            <TabsTrigger value="signs">Signs</TabsTrigger>
+            <TabsTrigger value="stands">Stands</TabsTrigger>
+          </TabsList>
 
-        <AssetFilters
-          filters={filters}
-          onFiltersChange={setFilters}
-          signageTypeNames={signageTypeNames}
-        />
+          {/* ----- Signs tab ----- */}
+          <TabsContent value="signs" className="space-y-6">
+            <SignSummaryCards stats={signStats} />
 
-        <AssetTable
-          annotations={filteredAnnotations}
-          onUpdateAnnotation={onUpdateAnnotation}
-          signageTypes={signageTypes}
-          subTypesByParent={subTypesByParent}
-        />
+            <SignFilterBar
+              filters={signFilters}
+              onFiltersChange={setSignFilters}
+              signageTypeNames={signageTypeNames}
+            />
+
+            <SignTable
+              rows={filteredSignRows}
+              onUpdateAnnotation={onUpdateAnnotation}
+              signageTypes={signageTypes}
+              subTypesByParent={subTypesByParent}
+            />
+          </TabsContent>
+
+          {/* ----- Stands tab ----- */}
+          <TabsContent value="stands" className="space-y-6">
+            <StandSummaryCards stats={standStats} />
+
+            <StandFilterBar
+              filters={standFilters}
+              onFiltersChange={setStandFilters}
+            />
+
+            <StandTable
+              rows={filteredStandRows}
+              onUpdateAnnotation={onUpdateAnnotation}
+              signageTypes={signageTypes}
+              subTypesByParent={subTypesByParent}
+            />
+          </TabsContent>
+        </Tabs>
       </div>
     </ScrollArea>
   );

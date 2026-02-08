@@ -22,12 +22,20 @@ export type SignDirection =
 
 export type SignHolderType = 'sign-pedestal-1' | 'sign-pedestal-2';
 
+// New asset tracking — per-sign-face statuses
+export type SignStatus = 'in_design' | 'ordered' | 'shipped' | 'delivered' | 'installed';
+
+// New asset tracking — per-stand statuses
+export type StandStatus = 'not_ordered' | 'ordered' | 'shipped' | 'delivered';
+
 // Interface for side-specific sign data
 // NOTE: Images are stored on signage_types / signage_sub_types, not per-annotation.
 export interface SignSide {
   direction?: SignDirection;
   signageTypeName?: string;
   signageSubTypeName?: string;
+  // Per-face sign status (new asset tracking)
+  signStatus?: SignStatus;
 }
 
 export interface Point {
@@ -61,8 +69,10 @@ export interface Annotation {
   notes?: string;
   // Annotation-specific color (resolved from signage type/sub-type at creation)
   color?: string;
-  // Asset tracking - order status for signage annotations
+  // Asset tracking - order status for signage annotations (legacy)
   orderStatus?: OrderStatus;
+  // Per-stand status (new asset tracking)
+  standStatus?: StandStatus;
 }
 
 export interface LayerVisibility {
@@ -79,7 +89,7 @@ export interface SubLayerVisibility {
 
 export type EditorMode = 'edit' | 'view' | 'assets';
 
-// Asset tracking
+// Asset tracking (legacy — kept for backward compatibility with existing annotation data)
 export type OrderStatus = 'not_ordered' | 'ordered' | 'shipped' | 'installed';
 
 export const ORDER_STATUSES: Record<OrderStatus, { label: string }> = {
@@ -87,6 +97,21 @@ export const ORDER_STATUSES: Record<OrderStatus, { label: string }> = {
   ordered: { label: 'Ordered' },
   shipped: { label: 'Shipped' },
   installed: { label: 'Installed' },
+};
+
+export const SIGN_STATUSES: Record<SignStatus, { label: string }> = {
+  in_design: { label: 'In Design' },
+  ordered: { label: 'Ordered' },
+  shipped: { label: 'Shipped' },
+  delivered: { label: 'Delivered' },
+  installed: { label: 'Installed' },
+};
+
+export const STAND_STATUSES: Record<StandStatus, { label: string }> = {
+  not_ordered: { label: 'Not Ordered' },
+  ordered: { label: 'Ordered' },
+  shipped: { label: 'Shipped' },
+  delivered: { label: 'Delivered' },
 };
 
 // Helper to determine if an annotation type uses lines or markers
