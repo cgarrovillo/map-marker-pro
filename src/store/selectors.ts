@@ -66,6 +66,12 @@ export const selectIsAnnotationVisible = createSelector(
   }
 );
 
+// Whether a placement tool is active (vs pointer/select mode)
+export const selectHasActiveTool = createSelector(
+  [selectSelectedType],
+  (type) => type !== null
+);
+
 // Combined selector for annotation type selection
 export const selectAnnotationTypeSelection = createSelector(
   [selectSelectedCategory, selectSelectedType],

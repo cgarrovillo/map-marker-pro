@@ -35,6 +35,7 @@ import {
   selectFocusedCategory,
   selectPendingLine,
   selectIsAnnotationVisible,
+  selectHasActiveTool,
 } from '@/store/selectors';
 import {
   setTransform,
@@ -49,6 +50,7 @@ import {
 import {
   setSelectedAnnotationId,
   setPendingLine,
+  clearActiveTool,
 } from '@/store/slices/uiSlice';
 
 interface CanvasProps {
@@ -153,6 +155,7 @@ export function Canvas({
   const isEditMode = useAppSelector(selectIsEditMode);
   const selectedCategory = useAppSelector(selectSelectedCategory);
   const selectedType = useAppSelector(selectSelectedType);
+  const hasActiveTool = useAppSelector(selectHasActiveTool);
   const selectedAnnotationId = useAppSelector(selectSelectedAnnotationId);
   const focusedCategory = useAppSelector(selectFocusedCategory);
   const pendingLine = useAppSelector(selectPendingLine);
@@ -171,7 +174,7 @@ export function Canvas({
   const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(null);
   
   // Whether the current annotation type uses lines or markers
-  const usesLineDrawing = isLineAnnotation(selectedCategory, selectedType);
+  const usesLineDrawing = selectedType !== null && isLineAnnotation(selectedCategory, selectedType);
 
   // Calculate the actual rendered image bounds within the container (accounting for object-contain)
   const getImageBounds = useCallback(() => {
@@ -393,11 +396,14 @@ export function Canvas({
       if (!isEditMode || !image) return;
       if (isPanning || draggingAnnotation) return;
 
-      const pos = screenToCanvasPercent(e.clientX, e.clientY);
-      if (!pos) return;
-
       // Clear selection when clicking on empty canvas
       dispatch(setSelectedAnnotationId(null));
+
+      // Pointer mode — no tool selected, just deselect and return
+      if (!hasActiveTool) return;
+
+      const pos = screenToCanvasPercent(e.clientX, e.clientY);
+      if (!pos) return;
 
       if (usesLineDrawing) {
         if (!pendingLine) {
@@ -415,13 +421,12 @@ export function Canvas({
       image,
       isPanning,
       draggingAnnotation,
+      hasActiveTool,
       screenToCanvasPercent,
       onAddAnnotation,
       pendingLine,
       usesLineDrawing,
       dispatch,
-      selectedCategory,
-      selectedType,
     ]
   );
 
@@ -471,6 +476,8 @@ export function Canvas({
           dispatch(setPendingLine(null));
         } else if (selectedAnnotationId) {
           dispatch(setSelectedAnnotationId(null));
+        } else if (hasActiveTool) {
+          dispatch(clearActiveTool());
         }
       }
       
@@ -483,7 +490,7 @@ export function Canvas({
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [pendingLine, selectedAnnotationId, isEditMode, onDeleteAnnotation, dispatch]);
+  }, [pendingLine, selectedAnnotationId, hasActiveTool, isEditMode, onDeleteAnnotation, dispatch]);
 
   // Handle mouse up outside of component
   useEffect(() => {
@@ -506,6 +513,7 @@ export function Canvas({
     if (isPanning) return 'grabbing';
     if (draggingAnnotation) return 'grabbing';
     if (!isEditMode) return 'default';
+    if (!hasActiveTool) return 'default';  // Pointer mode — no placement tool selected
     return 'crosshair';
   };
 
@@ -575,7 +583,11 @@ export function Canvas({
       style={{ cursor: getCursor() }}
     >
       {/* Zoom Controls */}
-      <div className="absolute top-3 left-3 z-20 flex items-center gap-2 bg-card/95 backdrop-blur-sm rounded-lg p-1.5 shadow-lg border border-border">
+      <div
+        className="absolute top-3 left-3 z-20 flex items-center gap-2 bg-card/95 backdrop-blur-sm rounded-lg p-1.5 shadow-lg border border-border"
+        onClick={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
+      >
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
@@ -638,7 +650,11 @@ export function Canvas({
       </div>
 
       {/* Replace image button */}
-      <div className="absolute top-3 right-3 z-10">
+      <div
+        className="absolute top-3 right-3 z-10"
+        onClick={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
+      >
         <Tooltip>
           <TooltipTrigger asChild>
             <label>
@@ -784,7 +800,7 @@ export function Canvas({
             })}
 
                 {/* Pending line preview */}
-                {pendingLine && mousePos && (
+                {pendingLine && mousePos && selectedType && (
                   <line
                     x1={pendingLine[pendingLine.length - 1].x}
                     y1={pendingLine[pendingLine.length - 1].y}
@@ -973,7 +989,7 @@ export function Canvas({
       </div>
 
       {/* Crosshair for line drawing mode */}
-      {isEditMode && usesLineDrawing && mousePos && !isPanning && (() => {
+      {isEditMode && selectedType && usesLineDrawing && mousePos && !isPanning && (() => {
         const bounds = getImageBounds();
         if (!bounds) return null;
         
@@ -1006,14 +1022,22 @@ export function Canvas({
 
       {/* Pending line instructions */}
       {isEditMode && pendingLine && (
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-card/90 backdrop-blur-sm px-4 py-2 rounded-lg text-sm z-10">
+        <div
+          className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-card/90 backdrop-blur-sm px-4 py-2 rounded-lg text-sm z-10"
+          onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
           Click to complete line • <kbd className="px-1.5 py-0.5 bg-secondary rounded text-xs font-mono">Esc</kbd> to cancel
         </div>
       )}
 
       {/* Selected annotation hint */}
       {isEditMode && selectedAnnotationId && !pendingLine && (
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-card/90 backdrop-blur-sm px-4 py-2 rounded-lg text-sm z-10">
+        <div
+          className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-card/90 backdrop-blur-sm px-4 py-2 rounded-lg text-sm z-10"
+          onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
           Drag to move • <kbd className="px-1.5 py-0.5 bg-secondary rounded text-xs font-mono">Del</kbd> to delete • <kbd className="px-1.5 py-0.5 bg-secondary rounded text-xs font-mono">Esc</kbd> to deselect
         </div>
       )}

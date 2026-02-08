@@ -34,7 +34,7 @@ const initialSubLayerVisibility: SubLayerVisibility = {
 interface UiState {
   mode: EditorMode;
   selectedCategory: AnnotationCategory;
-  selectedType: AnnotationType;
+  selectedType: AnnotationType | null;  // null = pointer mode (no placement tool active)
   selectedSignageTypeId: string | null;  // ID of selected signage type (from database)
   selectedSignageSubTypeId: string | null;  // ID of selected signage sub-type (from database)
   selectedWashroomSubType: WashroomSubType | null;  // Deprecated - kept for backwards compatibility
@@ -54,7 +54,7 @@ interface UiState {
 const initialState: UiState = {
   mode: 'edit',
   selectedCategory: 'signage',
-  selectedType: 'alcohol',
+  selectedType: null,  // Default to pointer mode — no placement tool active
   selectedSignageTypeId: null,
   selectedSignageSubTypeId: null,
   selectedWashroomSubType: null,
@@ -86,6 +86,14 @@ const uiSlice = createSlice({
       state,
       action: PayloadAction<{ category: AnnotationCategory; type: AnnotationType }>
     ) => {
+      // Toggle off if re-selecting the same type (go back to pointer mode)
+      if (state.selectedCategory === action.payload.category && state.selectedType === action.payload.type) {
+        state.selectedType = null;
+        state.selectedSignageTypeId = null;
+        state.selectedSignageSubTypeId = null;
+        state.selectedWashroomSubType = null;
+        return;
+      }
       state.selectedCategory = action.payload.category;
       state.selectedType = action.payload.type;
       // Clear signage type/sub-type selection when selecting a different type
@@ -93,6 +101,13 @@ const uiSlice = createSlice({
       state.selectedSignageSubTypeId = null;
       // Clear washroom sub-type selection (deprecated)
       state.selectedWashroomSubType = null;
+    },
+    clearActiveTool: (state) => {
+      state.selectedType = null;
+      state.selectedSignageTypeId = null;
+      state.selectedSignageSubTypeId = null;
+      state.selectedWashroomSubType = null;
+      state.pendingLine = null;
     },
     setSelectedSignageTypeId: (state, action: PayloadAction<string | null>) => {
       state.selectedSignageTypeId = action.payload;
@@ -110,6 +125,17 @@ const uiSlice = createSlice({
       action: PayloadAction<{ signageTypeId: string; subTypeId: string } | null>
     ) => {
       if (action.payload) {
+        // Toggle off if re-selecting the same sub-type (go back to pointer mode)
+        if (
+          state.selectedSignageTypeId === action.payload.signageTypeId &&
+          state.selectedSignageSubTypeId === action.payload.subTypeId
+        ) {
+          state.selectedType = null;
+          state.selectedSignageTypeId = null;
+          state.selectedSignageSubTypeId = null;
+          state.selectedWashroomSubType = null;
+          return;
+        }
         state.selectedSignageTypeId = action.payload.signageTypeId;
         state.selectedSignageSubTypeId = action.payload.subTypeId;
         state.selectedCategory = 'signage';
@@ -174,6 +200,7 @@ const uiSlice = createSlice({
 export const {
   setMode,
   selectAnnotationType,
+  clearActiveTool,
   setSelectedSignageTypeId,
   setSelectedSignageSubTypeId,
   setSelectedWashroomSubType,

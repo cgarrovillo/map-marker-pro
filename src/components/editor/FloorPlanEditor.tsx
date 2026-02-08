@@ -121,7 +121,7 @@ export function FloorPlanEditor() {
 
   const handleAddAnnotation = useCallback(
     async (points: { x: number; y: number }[], label?: string) => {
-      if (!activeLayoutId) return;
+      if (!activeLayoutId || !selectedType) return;
       
       // For signage annotations with the two-level hierarchy
       let signageTypeName: string | undefined;
