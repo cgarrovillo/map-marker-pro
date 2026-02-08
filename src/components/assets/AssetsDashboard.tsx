@@ -9,11 +9,14 @@ import type { Annotation } from '@/types/annotations';
 import type { AssetFilters as AssetFiltersType } from '@/hooks/useAssetStats';
 import type { Tables } from '@/integrations/supabase/types';
 
+type SignageTypeRow = Tables<'signage_types'>;
+
 interface AssetsDashboardProps {
   annotations: Annotation[];
   onUpdateAnnotation: (id: string, updates: Partial<Annotation>) => Promise<void>;
   activeLayout: Tables<'venue_layouts'> | null;
   activeEvent: Tables<'events'> | null;
+  signageTypes?: SignageTypeRow[];
 }
 
 export function AssetsDashboard({
@@ -21,6 +24,7 @@ export function AssetsDashboard({
   onUpdateAnnotation,
   activeLayout,
   activeEvent,
+  signageTypes = [],
 }: AssetsDashboardProps) {
   const [filters, setFilters] = useState<AssetFiltersType>(defaultFilters);
 
@@ -75,6 +79,7 @@ export function AssetsDashboard({
         <AssetTable
           annotations={filteredAnnotations}
           onUpdateAnnotation={onUpdateAnnotation}
+          signageTypes={signageTypes}
         />
       </div>
     </ScrollArea>

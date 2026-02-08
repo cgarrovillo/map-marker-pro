@@ -57,6 +57,8 @@ export interface Annotation {
   direction?: SignDirection;
   // Annotation-specific notes
   notes?: string;
+  // Annotation-specific color (resolved from signage type/sub-type at creation)
+  color?: string;
   // Asset tracking - order status for signage annotations
   orderStatus?: OrderStatus;
 }
@@ -140,6 +142,9 @@ export const SIGN_HOLDERS: Record<SignHolderType, { label: string; sides: 1 | 2 
   'sign-pedestal-1': { label: 'Sign Pedestal (1-sided)', sides: 1 },
   'sign-pedestal-2': { label: 'Sign Pedestal (2-sided)', sides: 2 },
 };
+
+// Default sign holder when not explicitly set
+export const DEFAULT_SIGN_HOLDER: SignHolderType = 'sign-pedestal-2';
 
 export interface FloorPlanEvent {
   id: string;

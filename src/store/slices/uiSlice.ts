@@ -42,6 +42,12 @@ interface UiState {
   focusedCategory: AnnotationCategory | null;
   layerVisibility: LayerVisibility;
   subLayerVisibility: SubLayerVisibility;
+  // Dynamic signage type visibility keyed by signage type name (or static type key like "alcohol").
+  // Missing keys default to true (visible). Only explicitly hidden types are stored.
+  signageTypeVisibility: Record<string, boolean>;
+  // Dynamic signage sub-type visibility keyed by "parentName/subTypeName" composite key.
+  // Missing keys default to true (visible).
+  signageSubTypeVisibility: Record<string, boolean>;
   pendingLine: Point[] | null;
 }
 
@@ -60,6 +66,8 @@ const initialState: UiState = {
     flow: true,
   },
   subLayerVisibility: initialSubLayerVisibility,
+  signageTypeVisibility: {},
+  signageSubTypeVisibility: {},
   pendingLine: null,
 };
 
@@ -146,6 +154,17 @@ const uiSlice = createSlice({
           !state.subLayerVisibility.flow[type as FlowType];
       }
     },
+    toggleSignageTypeVisibility: (state, action: PayloadAction<string>) => {
+      const name = action.payload;
+      const current = state.signageTypeVisibility[name] ?? true;
+      state.signageTypeVisibility[name] = !current;
+    },
+    toggleSignageSubTypeVisibility: (state, action: PayloadAction<string>) => {
+      // key format: "parentName/subTypeName"
+      const key = action.payload;
+      const current = state.signageSubTypeVisibility[key] ?? true;
+      state.signageSubTypeVisibility[key] = !current;
+    },
     setPendingLine: (state, action: PayloadAction<Point[] | null>) => {
       state.pendingLine = action.payload;
     },
@@ -162,6 +181,8 @@ export const {
   setFocusedCategory,
   toggleLayerVisibility,
   toggleSubLayerVisibility,
+  toggleSignageTypeVisibility,
+  toggleSignageSubTypeVisibility,
   setPendingLine,
 } = uiSlice.actions;
 

@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { DEFAULT_SIGN_HOLDER } from '@/types/annotations';
 import type { Annotation, OrderStatus, SignHolderType } from '@/types/annotations';
 
 export interface AssetFilters {
@@ -11,15 +12,15 @@ export interface AssetFilters {
 export interface AssetStats {
   total: number;
   byStatus: Record<OrderStatus, number>;
-  byHolder: Record<SignHolderType | 'unassigned', number>;
+  byHolder: Record<SignHolderType, number>;
 }
 
 function getEffectiveStatus(annotation: Annotation): OrderStatus {
   return annotation.orderStatus ?? 'not_ordered';
 }
 
-function getEffectiveHolder(annotation: Annotation): SignHolderType | 'unassigned' {
-  return annotation.signHolder ?? 'unassigned';
+function getEffectiveHolder(annotation: Annotation): SignHolderType {
+  return annotation.signHolder || DEFAULT_SIGN_HOLDER;
 }
 
 export function useAssetStats(annotations: Annotation[], filters: AssetFilters) {
@@ -37,10 +38,9 @@ export function useAssetStats(annotations: Annotation[], filters: AssetFilters) 
       shipped: 0,
       installed: 0,
     };
-    const byHolder: Record<SignHolderType | 'unassigned', number> = {
+    const byHolder: Record<SignHolderType, number> = {
       'sign-pedestal-1': 0,
       'sign-pedestal-2': 0,
-      unassigned: 0,
     };
 
     for (const a of signageAnnotations) {

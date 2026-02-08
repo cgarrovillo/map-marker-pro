@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Tables, TablesInsert, TablesUpdate, Json } from '@/integrations/supabase/types';
-import { Annotation, Point, WashroomSubType } from '@/types/annotations';
+import { Annotation, Point, WashroomSubType, DEFAULT_SIGN_HOLDER } from '@/types/annotations';
 
 type VenueLayout = Tables<'venue_layouts'>;
 type VenueLayoutInsert = TablesInsert<'venue_layouts'>;
@@ -204,6 +204,8 @@ export function useVenueLayouts(eventId: string | null) {
         points,
         label,
         createdAt: Date.now(),
+        // Set default sign holder for signage annotations
+        ...(category === 'signage' && { signHolder: DEFAULT_SIGN_HOLDER }),
         // Include signageTypeName for parent signage type
         ...(signageTypeName && { signageTypeName }),
         // Include signageSubTypeName for the specific sub-type

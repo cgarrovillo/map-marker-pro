@@ -1,8 +1,8 @@
 import { useRef, useState, useEffect } from 'react';
 import { Upload, X, ArrowUp, ImageIcon, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
@@ -18,12 +18,10 @@ import {
   SignDirection,
   SignHolderType,
   SignSide,
-  SIGNAGE_TYPES,
   SIGN_DIRECTIONS,
   SIGN_HOLDERS,
+  DEFAULT_SIGN_HOLDER,
   WASHROOM_SUB_TYPES,
-  SignageType,
-  WashroomSubType,
 } from '@/types/annotations';
 import { useSignImageUpload } from '@/hooks/useSignImageUpload';
 import { cn } from '@/lib/utils';
@@ -281,24 +279,17 @@ function getSideData(annotation: Annotation, side: 1 | 2): SignSide | undefined 
 export function SignDetailsPanel({ annotation, onUpdate }: SignDetailsPanelProps) {
   const { uploading, uploadSignImage, deleteSignImage } = useSignImageUpload();
   const [activeTab, setActiveTab] = useState<string>('side1');
-  const [signageNameInput, setSignageNameInput] = useState<string>(annotation.signageTypeName || '');
+  const [annotationNotes, setAnnotationNotes] = useState<string>(annotation.notes || '');
   
-  // Sync signageNameInput when annotation changes
+  // Sync notes when annotation changes
   useEffect(() => {
-    setSignageNameInput(annotation.signageTypeName || '');
-  }, [annotation.signageTypeName]);
+    setAnnotationNotes(annotation.notes || '');
+  }, [annotation.notes, annotation.id]);
   
-  // Get label - for ticket types, use the name; for others, use static config
-  const isTicketType = annotation.type === 'ticket';
   const isWashroom = annotation.type === 'washroom';
-  
-  const signageConfig = SIGNAGE_TYPES[annotation.type as SignageType];
-  const signLabel = isTicketType 
-    ? (annotation.signageTypeName || 'Signage Type')
-    : (signageConfig?.label || annotation.type);
 
   // Get current holder config (default to 2-sided pedestal)
-  const currentHolder = annotation.signHolder || 'sign-pedestal-2';
+  const currentHolder = annotation.signHolder || DEFAULT_SIGN_HOLDER;
   const holderConfig = SIGN_HOLDERS[currentHolder];
   const isTwoSided = holderConfig?.sides === 2;
 
@@ -364,60 +355,17 @@ export function SignDetailsPanel({ annotation, onUpdate }: SignDetailsPanelProps
     });
   };
 
-  const handleSignageNameChange = (value: string) => {
-    setSignageNameInput(value);
-  };
-
-  const handleSignageNameBlur = () => {
-    const trimmedName = signageNameInput.trim();
-    if (trimmedName && trimmedName !== annotation.signageTypeName) {
-      onUpdate({ signageTypeName: trimmedName });
-    } else if (!trimmedName) {
-      // Reset to original value if empty
-      setSignageNameInput(annotation.signageTypeName || '');
-    }
-  };
-
-  const handleSignageNameKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      e.currentTarget.blur();
-    } else if (e.key === 'Escape') {
-      setSignageNameInput(annotation.signageTypeName || '');
-      e.currentTarget.blur();
+  const handleAnnotationNotesBlur = () => {
+    const trimmed = annotationNotes.trim();
+    const newNotes = trimmed || undefined;
+    if (newNotes !== annotation.notes) {
+      onUpdate({ notes: newNotes });
     }
   };
 
   return (
-    <div className="border-t border-border">
-      <div className="p-4 border-b border-border">
-        <h3 className="text-sm font-semibold">Sign Details</h3>
-        <p className="text-xs text-muted-foreground mt-0.5">{signLabel}</p>
-      </div>
-      
+    <div>
       <div className="p-4 space-y-4">
-        {/* Signage Type Name Input - Only for signage type signs */}
-        {isTicketType && (
-          <>
-            <div className="space-y-2">
-              <Label htmlFor="signage-name" className="text-xs text-muted-foreground">
-                Signage Type Name
-              </Label>
-              <Input
-                id="signage-name"
-                value={signageNameInput}
-                onChange={(e) => handleSignageNameChange(e.target.value)}
-                onBlur={handleSignageNameBlur}
-                onKeyDown={handleSignageNameKeyDown}
-                placeholder="e.g., VIP, General Admission"
-              />
-              <p className="text-xs text-muted-foreground">
-                Press Enter to save, Escape to cancel
-              </p>
-            </div>
-            <Separator />
-          </>
-        )}
-
         {/* Washroom Sub-Type Display - Only for washroom signs (read-only, set from sidebar) */}
         {isWashroom && annotation.washroomSubType && (
           <>
@@ -498,6 +446,26 @@ export function SignDetailsPanel({ annotation, onUpdate }: SignDetailsPanelProps
             />
           </TabsContent>
         </Tabs>
+
+        <Separator />
+
+        {/* Annotation-specific Notes */}
+        <div className="space-y-2">
+          <Label htmlFor="annotation-notes" className="text-xs text-muted-foreground">
+            Sign Notes
+          </Label>
+          <Textarea
+            id="annotation-notes"
+            value={annotationNotes}
+            onChange={(e) => setAnnotationNotes(e.target.value)}
+            onBlur={handleAnnotationNotesBlur}
+            placeholder="Notes specific to this sign..."
+            className="min-h-[80px] resize-none text-sm"
+          />
+          <p className="text-xs text-muted-foreground">
+            Specific to this annotation only
+          </p>
+        </div>
       </div>
     </div>
   );

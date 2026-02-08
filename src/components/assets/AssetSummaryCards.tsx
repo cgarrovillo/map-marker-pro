@@ -74,12 +74,6 @@ export function AssetSummaryCards({ stats }: AssetSummaryCardsProps) {
               <span className="text-muted-foreground">2-sided</span>
               <span className="font-semibold">{stats.byHolder['sign-pedestal-2']}</span>
             </div>
-            {stats.byHolder.unassigned > 0 && (
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Unassigned</span>
-                <span className="font-semibold">{stats.byHolder.unassigned}</span>
-              </div>
-            )}
           </div>
         </CardContent>
       </Card>

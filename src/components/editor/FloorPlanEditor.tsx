@@ -66,6 +66,7 @@ export function FloorPlanEditor() {
     loading: signageTypesLoading,
     createSignageType,
     deleteSignageType,
+    renameSignageType,
     updateSignageTypeNotes,
     updateSignageTypeColor,
   } = useSignageTypes(activeLayoutId);
@@ -81,6 +82,7 @@ export function FloorPlanEditor() {
     loading: subTypesLoading,
     createSubType,
     deleteSubType,
+    renameSubType,
     updateSubTypeColor,
   } = useSignageSubTypes(activeLayoutId, signageTypeIds);
 
@@ -206,9 +208,6 @@ export function FloorPlanEditor() {
     toast.success('Event exported');
   }, [activeLayout, activeEvent, getAnnotations]);
 
-  const handleImport = useCallback(() => {
-    toast.info('Import feature coming soon');
-  }, []);
 
   const handleClear = useCallback(async () => {
     if (!activeLayoutId || !activeLayout) {
@@ -392,11 +391,13 @@ export function FloorPlanEditor() {
           
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon" onClick={handleImport}>
-                <Upload className="w-4 h-4" />
-              </Button>
+              <span className="inline-flex">
+                <Button variant="ghost" size="icon" disabled className="opacity-50 cursor-not-allowed">
+                  <Upload className="w-4 h-4" />
+                </Button>
+              </span>
             </TooltipTrigger>
-            <TooltipContent>Import annotations</TooltipContent>
+            <TooltipContent>Coming soon</TooltipContent>
           </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -450,6 +451,7 @@ export function FloorPlanEditor() {
             onUpdateAnnotation={handleUpdateAnnotation}
             activeLayout={activeLayout}
             activeEvent={activeEvent}
+            signageTypes={signageTypes}
           />
         ) : (
           <>
@@ -466,6 +468,9 @@ export function FloorPlanEditor() {
                 onDeleteSubType={deleteSubType}
                 onUpdateSignageTypeColor={updateSignageTypeColor}
                 onUpdateSubTypeColor={updateSubTypeColor}
+                onRenameSignageType={renameSignageType}
+                onUpdateSignageTypeNotes={updateSignageTypeNotes}
+                onRenameSubType={renameSubType}
               />
             )}
 
@@ -484,6 +489,8 @@ export function FloorPlanEditor() {
                 onAddAnnotation={handleAddAnnotation}
                 onDeleteAnnotation={handleDeleteAnnotation}
                 onUpdateAnnotation={handleUpdateAnnotation}
+                signageTypes={signageTypes}
+                subTypesByParent={subTypesByParent}
               />
             ) : (
               <div className="flex-1 flex items-center justify-center canvas-grid">
@@ -515,7 +522,7 @@ export function FloorPlanEditor() {
               selectedAnnotation={selectedAnnotation}
               onUpdateAnnotation={handleUpdateAnnotation}
               signageTypes={signageTypes}
-              onUpdateSignageTypeNotes={updateSignageTypeNotes}
+              subTypesByParent={subTypesByParent}
             />
           </>
         )}

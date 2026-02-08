@@ -10,12 +10,17 @@ import {
   FLOW_TYPES,
   SIGN_DIRECTIONS,
   SIGN_HOLDERS,
+  DEFAULT_SIGN_HOLDER,
   SignSide,
   isLineAnnotation,
   AnnotationCategory,
   AnnotationType,
 } from '@/types/annotations';
+import { Tables } from '@/integrations/supabase/types';
 import { cn } from '@/lib/utils';
+
+type SignageType = Tables<'signage_types'>;
+type SignageSubType = Tables<'signage_sub_types'>;
 import { useAppSelector, useAppDispatch } from '@/store/hooks';
 import {
   selectTransform,
@@ -53,20 +58,52 @@ interface CanvasProps {
   onAddAnnotation: (points: Point[], label?: string) => void;
   onDeleteAnnotation: (id: string) => void;
   onUpdateAnnotation?: (id: string, updates: Partial<Annotation>) => void;
+  signageTypes?: SignageType[];
+  subTypesByParent?: Record<string, SignageSubType[]>;
 }
 
-const getTypeColor = (category: AnnotationCategory, type: AnnotationType): string => {
-  const colors: Record<string, string> = {
-    'signage-ticket': 'hsl(210, 85%, 55%)',
-    'signage-alcohol': 'hsl(340, 75%, 55%)',
-    'signage-accessibility': 'hsl(200, 80%, 50%)',
-    'signage-washroom': 'hsl(230, 70%, 60%)',
-    'barrier-stanchion': 'hsl(35, 90%, 55%)',
-    'barrier-drape': 'hsl(25, 85%, 50%)',
-    'flow-ingress': 'hsl(145, 70%, 45%)',
-    'flow-egress': 'hsl(0, 75%, 55%)',
-  };
-  return colors[`${category}-${type}`] || 'hsl(185, 75%, 55%)';
+const DEFAULT_TYPE_COLORS: Record<string, string> = {
+  'signage-ticket': 'hsl(210, 85%, 55%)',
+  'signage-alcohol': 'hsl(340, 75%, 55%)',
+  'signage-accessibility': 'hsl(200, 80%, 50%)',
+  'signage-washroom': 'hsl(230, 70%, 60%)',
+  'barrier-stanchion': 'hsl(35, 90%, 55%)',
+  'barrier-drape': 'hsl(25, 85%, 50%)',
+  'flow-ingress': 'hsl(145, 70%, 45%)',
+  'flow-egress': 'hsl(0, 75%, 55%)',
+};
+
+/**
+ * Resolve annotation color dynamically from live signage types data.
+ * Priority: sub-type color > parent type color > stored annotation.color > hardcoded default
+ */
+const getTypeColor = (
+  category: AnnotationCategory,
+  type: AnnotationType,
+  annotation?: Annotation,
+  signageTypes?: SignageType[],
+  subTypesByParent?: Record<string, SignageSubType[]>,
+): string => {
+  // For signage annotations, resolve color from live signage types data
+  if (annotation && category === 'signage' && signageTypes && annotation.signageTypeName) {
+    const matchingType = signageTypes.find(t => t.name === annotation.signageTypeName);
+    if (matchingType) {
+      // Sub-type color takes priority
+      if (annotation.signageSubTypeName && subTypesByParent) {
+        const subTypes = subTypesByParent[matchingType.id] || [];
+        const matchingSubType = subTypes.find(st => st.name === annotation.signageSubTypeName);
+        if (matchingSubType?.color) return matchingSubType.color;
+      }
+      // Parent type color
+      if (matchingType.color) return matchingType.color;
+    }
+  }
+
+  // Fallback: stored annotation color (for deleted types or non-signage)
+  if (annotation?.color) return annotation.color;
+
+  // Fallback: hardcoded defaults
+  return DEFAULT_TYPE_COLORS[`${category}-${type}`] || 'hsl(185, 75%, 55%)';
 };
 
 const getTypeLabel = (category: AnnotationCategory, type: AnnotationType, annotation?: Annotation): string => {
@@ -98,6 +135,8 @@ export function Canvas({
   onAddAnnotation,
   onDeleteAnnotation,
   onUpdateAnnotation,
+  signageTypes,
+  subTypesByParent,
 }: CanvasProps) {
   const dispatch = useAppDispatch();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -676,7 +715,7 @@ export function Canvas({
             .map((annotation) => {
               const opacity =
                 focusedCategory && focusedCategory !== annotation.category ? 0.2 : 1;
-              const color = getTypeColor(annotation.category, annotation.type);
+              const color = getTypeColor(annotation.category, annotation.type, annotation, signageTypes, subTypesByParent);
               const isBeingDragged = draggingAnnotation?.id === annotation.id;
               const isSelected = selectedAnnotationId === annotation.id;
               const points = isBeingDragged ? draggingAnnotation.currentPoints : annotation.points;
@@ -766,7 +805,7 @@ export function Canvas({
                 .map((annotation) => {
                   const opacity =
                     focusedCategory && focusedCategory !== annotation.category ? 0.2 : 1;
-                  const color = getTypeColor(annotation.category, annotation.type);
+                  const color = getTypeColor(annotation.category, annotation.type, annotation, signageTypes, subTypesByParent);
                   const isBeingDragged = draggingAnnotation?.id === annotation.id;
                   const isSelected = selectedAnnotationId === annotation.id;
                   const point = isBeingDragged ? draggingAnnotation.currentPoints[0] : annotation.points[0];
@@ -776,7 +815,7 @@ export function Canvas({
                   // Signage annotations render as small dots with optional direction arrows
                   if (isSignage) {
                     // Get holder config to determine if 2-sided
-                    const currentHolder = annotation.signHolder || 'sign-pedestal-2';
+                    const currentHolder = annotation.signHolder || DEFAULT_SIGN_HOLDER;
                     const holderConfig = SIGN_HOLDERS[currentHolder];
                     const isTwoSided = holderConfig?.sides === 2;
 

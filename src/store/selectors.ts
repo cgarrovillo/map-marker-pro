@@ -15,6 +15,8 @@ export const selectSelectedAnnotationId = (state: RootState) => state.ui.selecte
 export const selectFocusedCategory = (state: RootState) => state.ui.focusedCategory;
 export const selectLayerVisibility = (state: RootState) => state.ui.layerVisibility;
 export const selectSubLayerVisibility = (state: RootState) => state.ui.subLayerVisibility;
+export const selectSignageTypeVisibility = (state: RootState) => state.ui.signageTypeVisibility;
+export const selectSignageSubTypeVisibility = (state: RootState) => state.ui.signageSubTypeVisibility;
 export const selectPendingLine = (state: RootState) => state.ui.pendingLine;
 
 // Canvas Selectors
@@ -30,17 +32,31 @@ export const selectZoomPercentage = createSelector(
 );
 
 // Visibility check for annotations (returns a function that can be called with an annotation)
+// All signage types (dynamic AND static) are now driven by signageTypeVisibility / signageSubTypeVisibility.
 export const selectIsAnnotationVisible = createSelector(
-  [selectLayerVisibility, selectSubLayerVisibility],
-  (layerVis, subLayerVis) => (annotation: Annotation): boolean => {
+  [selectLayerVisibility, selectSubLayerVisibility, selectSignageTypeVisibility, selectSignageSubTypeVisibility],
+  (layerVis, subLayerVis, signageTypeVis, signageSubTypeVis) => (annotation: Annotation): boolean => {
     if (!layerVis[annotation.category]) return false;
 
     const { category, type } = annotation;
     if (category === 'signage') {
-      // Ticket type annotations are always visible when signage layer is visible
-      // (since they are dynamic and don't have per-type visibility toggles)
-      if (type === 'ticket') return true;
-      return subLayerVis.signage[type as SignageType] ?? false;
+      if (type === 'ticket') {
+        // Dynamic signage types - check parent visibility, then sub-type
+        if (annotation.signageTypeName) {
+          const parentVisible = signageTypeVis[annotation.signageTypeName] ?? true;
+          if (!parentVisible) return false;
+
+          // If annotation has a sub-type, check sub-type visibility
+          if (annotation.signageSubTypeName) {
+            const subKey = `${annotation.signageTypeName}/${annotation.signageSubTypeName}`;
+            return signageSubTypeVis[subKey] ?? true;
+          }
+        }
+        return true; // Legacy ticket annotations without signageTypeName
+      }
+      // Static signage types (alcohol, accessibility, washroom)
+      // Unified under signageTypeVisibility keyed by the type string
+      return signageTypeVis[type] ?? true;
     } else if (category === 'barrier') {
       return subLayerVis.barrier[type as BarrierType] ?? false;
     } else if (category === 'flow') {

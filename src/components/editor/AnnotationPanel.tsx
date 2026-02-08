@@ -12,6 +12,7 @@ import {
   Plus,
   X,
   Trash2,
+  Settings,
 } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import {
@@ -25,6 +26,7 @@ import {
 } from '@/types/annotations';
 import { Tables } from '@/integrations/supabase/types';
 import { cn } from '@/lib/utils';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useAppSelector, useAppDispatch } from '@/store/hooks';
 import { 
   selectSelectedCategory, 
@@ -37,6 +39,8 @@ import { selectAnnotationType, setSelectedSignageTypeId, setSelectedSignageSubTy
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { ColorPicker } from '@/components/ui/ColorPicker';
+import { SignTypeDetailsSheet } from './SignTypeDetailsSheet';
+import { SignSubTypeDetailsSheet } from './SignSubTypeDetailsSheet';
 
 type SignageType = Tables<'signage_types'>;
 type SignageSubType = Tables<'signage_sub_types'>;
@@ -94,6 +98,9 @@ interface AnnotationPanelProps {
   onDeleteSubType: (signageTypeId: string, subTypeId: string) => Promise<void>;
   onUpdateSignageTypeColor: (id: string, color: string) => Promise<void>;
   onUpdateSubTypeColor: (signageTypeId: string, subTypeId: string, color: string) => Promise<void>;
+  onRenameSignageType: (id: string, newName: string) => Promise<void>;
+  onUpdateSignageTypeNotes: (id: string, notes: string | null) => Promise<void>;
+  onRenameSubType: (signageTypeId: string, subTypeId: string, newName: string) => Promise<void>;
 }
 
 interface CategorySectionProps {
@@ -244,6 +251,7 @@ function SubTypeItem({
   isEditMode,
   onSelect,
   onDelete,
+  onEdit,
   onColorChange,
   Icon,
 }: {
@@ -254,17 +262,18 @@ function SubTypeItem({
   isEditMode: boolean;
   onSelect: () => void;
   onDelete: () => void;
+  onEdit: () => void;
   onColorChange: (color: string) => void;
   Icon: React.ComponentType<{ className?: string }>;
 }) {
   const color = getSubTypeColor(subType, parentType);
-  const [showDelete, setShowDelete] = useState(false);
+  const [showActions, setShowActions] = useState(false);
 
   return (
     <div
       className="relative group"
-      onMouseEnter={() => setShowDelete(true)}
-      onMouseLeave={() => setShowDelete(false)}
+      onMouseEnter={() => setShowActions(true)}
+      onMouseLeave={() => setShowActions(false)}
     >
       <button
         onClick={() => isEditMode && onSelect()}
@@ -302,17 +311,29 @@ function SubTypeItem({
           {subType.name}
         </span>
       </button>
-      {isEditMode && showDelete && (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onDelete();
-          }}
-          className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-colors"
-          title="Delete sub-type"
-        >
-          <Trash2 className="w-3 h-3" />
-        </button>
+      {isEditMode && showActions && (
+        <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onEdit();
+            }}
+            className="p-1 rounded hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
+            title="Edit sub-type"
+          >
+            <Settings className="w-3 h-3" />
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete();
+            }}
+            className="p-1 rounded hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-colors"
+            title="Delete sub-type"
+          >
+            <Trash2 className="w-3 h-3" />
+          </button>
+        </div>
       )}
     </div>
   );
@@ -329,6 +350,8 @@ function SignageTypeAccordionItem({
   onAddSubType,
   onDeleteSubType,
   onDeleteSignageType,
+  onEdit,
+  onEditSubType,
   onColorChange,
   onSubTypeColorChange,
 }: {
@@ -341,12 +364,14 @@ function SignageTypeAccordionItem({
   onAddSubType: (signageTypeId: string, name: string) => void;
   onDeleteSubType: (signageTypeId: string, subTypeId: string) => void;
   onDeleteSignageType: (id: string) => void;
+  onEdit: () => void;
+  onEditSubType: (subType: SignageSubType) => void;
   onColorChange: (color: string) => void;
   onSubTypeColorChange: (subTypeId: string, color: string) => void;
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isAddingSubType, setIsAddingSubType] = useState(false);
-  const [showDelete, setShowDelete] = useState(false);
+  const [showActions, setShowActions] = useState(false);
 
   // Check if this parent type is selected (via one of its sub-types)
   const isParentSelected = selectedSignageTypeId === signageType.id;
@@ -361,8 +386,8 @@ function SignageTypeAccordionItem({
   return (
     <div
       className="mb-1"
-      onMouseEnter={() => setShowDelete(true)}
-      onMouseLeave={() => setShowDelete(false)}
+      onMouseEnter={() => setShowActions(true)}
+      onMouseLeave={() => setShowActions(false)}
     >
       {/* Signage Type Header */}
       <div className="relative">
@@ -400,28 +425,43 @@ function SignageTypeAccordionItem({
           <span className={cn('flex-1 text-left', isParentSelected && 'text-foreground font-medium')}>
             {signageType.name}
           </span>
-          <span className="text-xs text-muted-foreground mr-1">
-            {subTypes.length}
-          </span>
+          {/* Show actions on hover, count otherwise */}
+          {isEditMode && showActions ? (
+            <span className="flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEdit();
+                }}
+                className="p-1 rounded hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
+                title="Edit signage type"
+              >
+                <Settings className="w-3 h-3" />
+              </button>
+              {!signageType.is_default && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDeleteSignageType(signageType.id);
+                  }}
+                  className="p-1 rounded hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-colors"
+                  title="Delete signage type"
+                >
+                  <Trash2 className="w-3 h-3" />
+                </button>
+              )}
+            </span>
+          ) : (
+            <span className="text-xs text-muted-foreground mr-1">
+              {subTypes.length}
+            </span>
+          )}
           {isExpanded ? (
             <ChevronDown className="w-4 h-4 text-muted-foreground" />
           ) : (
             <ChevronRight className="w-4 h-4 text-muted-foreground" />
           )}
         </button>
-        {/* Delete button for non-default types */}
-        {isEditMode && showDelete && !signageType.is_default && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onDeleteSignageType(signageType.id);
-            }}
-            className="absolute right-8 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-colors"
-            title="Delete signage type"
-          >
-            <Trash2 className="w-3 h-3" />
-          </button>
-        )}
       </div>
 
       {/* Expanded content - sub-types */}
@@ -443,6 +483,7 @@ function SignageTypeAccordionItem({
                 isEditMode={isEditMode}
                 onSelect={() => onSelectSubType(signageType.id, subType.id)}
                 onDelete={() => onDeleteSubType(signageType.id, subType.id)}
+                onEdit={() => onEditSubType(subType)}
                 onColorChange={(color) => onSubTypeColorChange(subType.id, color)}
                 Icon={Icon}
               />
@@ -492,6 +533,8 @@ function SignagesSection({
   onDeleteSubType,
   onUpdateSignageTypeColor,
   onUpdateSubTypeColor,
+  onEditSignageType,
+  onEditSubType,
 }: {
   signageTypes: SignageType[];
   signageTypesLoading: boolean;
@@ -507,6 +550,8 @@ function SignagesSection({
   onDeleteSubType: (signageTypeId: string, subTypeId: string) => void;
   onUpdateSignageTypeColor: (id: string, color: string) => void;
   onUpdateSubTypeColor: (signageTypeId: string, subTypeId: string, color: string) => void;
+  onEditSignageType: (signageType: SignageType) => void;
+  onEditSubType: (subType: SignageSubType, parent: SignageType) => void;
 }) {
   const [isExpanded, setIsExpanded] = useState(true);
   const [isAddingSignageType, setIsAddingSignageType] = useState(false);
@@ -554,6 +599,8 @@ function SignagesSection({
                 onAddSubType={onAddSubType}
                 onDeleteSubType={onDeleteSubType}
                 onDeleteSignageType={onDeleteSignageType}
+                onEdit={() => onEditSignageType(signageType)}
+                onEditSubType={(subType) => onEditSubType(subType, signageType)}
                 onColorChange={(color) => onUpdateSignageTypeColor(signageType.id, color)}
                 onSubTypeColorChange={(subTypeId, color) => onUpdateSubTypeColor(signageType.id, subTypeId, color)}
               />
@@ -597,6 +644,9 @@ export function AnnotationPanel({
   onDeleteSubType,
   onUpdateSignageTypeColor,
   onUpdateSubTypeColor,
+  onRenameSignageType,
+  onUpdateSignageTypeNotes,
+  onRenameSubType,
 }: AnnotationPanelProps) {
   const dispatch = useAppDispatch();
   const selectedCategory = useAppSelector(selectSelectedCategory);
@@ -604,6 +654,10 @@ export function AnnotationPanel({
   const selectedSignageTypeId = useAppSelector(selectSelectedSignageTypeId);
   const selectedSignageSubTypeId = useAppSelector(selectSelectedSignageSubTypeId);
   const isEditMode = useAppSelector(selectIsEditMode);
+
+  // Sheet state for editing signage types and sub-types
+  const [editingType, setEditingType] = useState<SignageType | null>(null);
+  const [editingSubType, setEditingSubType] = useState<{ subType: SignageSubType; parent: SignageType } | null>(null);
 
   const handleSelect = (category: AnnotationCategory, type: AnnotationType) => {
     dispatch(selectAnnotationType({ category, type }));
@@ -700,31 +754,91 @@ export function AnnotationPanel({
           onDeleteSubType={handleDeleteSubType}
           onUpdateSignageTypeColor={onUpdateSignageTypeColor}
           onUpdateSubTypeColor={onUpdateSubTypeColor}
+          onEditSignageType={setEditingType}
+          onEditSubType={(subType, parent) => setEditingSubType({ subType, parent })}
         />
 
-        <CategorySection
-          title="Barriers"
-          category="barrier"
-          types={BARRIER_TYPES}
-          selectedCategory={selectedCategory}
-          selectedType={selectedType}
-          onSelect={handleSelect}
-          colorClass="text-barrier"
-          typeColorMap={barrierColors}
-          isEditMode={isEditMode}
-        />
-        <CategorySection
-          title="Crowd Flow"
-          category="flow"
-          types={FLOW_TYPES}
-          selectedCategory={selectedCategory}
-          selectedType={selectedType}
-          onSelect={handleSelect}
-          colorClass="text-flow"
-          typeColorMap={flowColors}
-          isEditMode={isEditMode}
-        />
+        {/* Coming soon - Barriers */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div className="relative">
+              <div className="opacity-40 pointer-events-none select-none">
+                <CategorySection
+                  title="Barriers"
+                  category="barrier"
+                  types={BARRIER_TYPES}
+                  selectedCategory={selectedCategory}
+                  selectedType={selectedType}
+                  onSelect={handleSelect}
+                  colorClass="text-barrier"
+                  typeColorMap={barrierColors}
+                  isEditMode={isEditMode}
+                />
+              </div>
+              <div className="absolute inset-0 cursor-not-allowed" />
+            </div>
+          </TooltipTrigger>
+          <TooltipContent>Coming soon</TooltipContent>
+        </Tooltip>
+
+        {/* Coming soon - Crowd Flow */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div className="relative">
+              <div className="opacity-40 pointer-events-none select-none">
+                <CategorySection
+                  title="Crowd Flow"
+                  category="flow"
+                  types={FLOW_TYPES}
+                  selectedCategory={selectedCategory}
+                  selectedType={selectedType}
+                  onSelect={handleSelect}
+                  colorClass="text-flow"
+                  typeColorMap={flowColors}
+                  isEditMode={isEditMode}
+                />
+              </div>
+              <div className="absolute inset-0 cursor-not-allowed" />
+            </div>
+          </TooltipTrigger>
+          <TooltipContent>Coming soon</TooltipContent>
+        </Tooltip>
       </div>
+
+      {/* Signage Type Details Sheet */}
+      <SignTypeDetailsSheet
+        signageType={editingType}
+        open={editingType !== null}
+        onOpenChange={(open) => { if (!open) setEditingType(null); }}
+        onRename={onRenameSignageType}
+        onUpdateNotes={onUpdateSignageTypeNotes}
+        onUpdateColor={onUpdateSignageTypeColor}
+        annotationCount={
+          editingType
+            ? annotations.filter((a) => a.category === 'signage' && a.signageTypeName === editingType.name).length
+            : 0
+        }
+      />
+
+      {/* Sub-Type Details Sheet */}
+      <SignSubTypeDetailsSheet
+        subType={editingSubType?.subType ?? null}
+        parentType={editingSubType?.parent ?? null}
+        open={editingSubType !== null}
+        onOpenChange={(open) => { if (!open) setEditingSubType(null); }}
+        onRename={onRenameSubType}
+        onUpdateColor={onUpdateSubTypeColor}
+        annotationCount={
+          editingSubType
+            ? annotations.filter(
+                (a) =>
+                  a.category === 'signage' &&
+                  a.signageTypeName === editingSubType.parent.name &&
+                  a.signageSubTypeName === editingSubType.subType.name
+              ).length
+            : 0
+        }
+      />
     </div>
   );
 }
