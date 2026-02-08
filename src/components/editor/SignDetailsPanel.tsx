@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
-import { ArrowUp } from 'lucide-react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { ArrowUp, X } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -45,6 +46,155 @@ const DIRECTION_POSITIONS: Record<SignDirection, { row: number; col: number }> =
   'down': { row: 2, col: 1 },
   'down-right': { row: 2, col: 2 },
 };
+
+// --- Orientation Dial (annotation-level compass for stand orientation) ---
+
+const DIAL_SIZE = 120;
+const DIAL_RADIUS = 48;
+const HANDLE_RADIUS = 7;
+const CENTER = DIAL_SIZE / 2;
+
+function computeAngleFromEvent(
+  e: React.MouseEvent | MouseEvent,
+  svgRect: DOMRect,
+): number {
+  const cx = svgRect.left + CENTER;
+  const cy = svgRect.top + CENTER;
+  const dx = e.clientX - cx;
+  const dy = e.clientY - cy;
+  // atan2 gives angle from positive X-axis (East). We want 0 = North (top), clockwise.
+  let angle = (Math.atan2(dx, -dy) * 180) / Math.PI;
+  if (angle < 0) angle += 360;
+  return Math.round(angle) % 360;
+}
+
+function OrientationDial({
+  value,
+  onChange,
+}: {
+  value: number | undefined;
+  onChange: (orientation: number | undefined) => void;
+}) {
+  const svgRef = useRef<SVGSVGElement>(null);
+  const dragging = useRef(false);
+
+  const angleDeg = value ?? 0;
+  // Compute handle position on the circle (0° = North = top)
+  const handleX = CENTER + DIAL_RADIUS * Math.sin((angleDeg * Math.PI) / 180);
+  const handleY = CENTER - DIAL_RADIUS * Math.cos((angleDeg * Math.PI) / 180);
+
+  const setAngleFromEvent = useCallback(
+    (e: React.MouseEvent | MouseEvent) => {
+      const svg = svgRef.current;
+      if (!svg) return;
+      const rect = svg.getBoundingClientRect();
+      const angle = computeAngleFromEvent(e, rect);
+      onChange(angle);
+    },
+    [onChange],
+  );
+
+  // Global mouse-move / mouse-up for drag — always registered so the ref check works
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      if (!dragging.current) return;
+      setAngleFromEvent(e);
+    };
+    const onUp = () => {
+      dragging.current = false;
+    };
+
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+  }, [setAngleFromEvent]);
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    dragging.current = true;
+    setAngleFromEvent(e);
+  };
+
+  const hasValue = value !== undefined;
+
+  return (
+    <div className="flex flex-col items-center gap-2">
+      <svg
+        ref={svgRef}
+        width={DIAL_SIZE}
+        height={DIAL_SIZE}
+        className="cursor-pointer select-none"
+        onMouseDown={handleMouseDown}
+      >
+        {/* Outer track ring */}
+        <circle
+          cx={CENTER}
+          cy={CENTER}
+          r={DIAL_RADIUS}
+          fill="none"
+          className="stroke-muted-foreground/20"
+          strokeWidth={2}
+        />
+
+        {/* Cardinal direction labels */}
+        <text x={CENTER} y={8} textAnchor="middle" className="fill-muted-foreground text-[10px] font-medium select-none">Up</text>
+        <text x={DIAL_SIZE - 4} y={CENTER + 3} textAnchor="end" className="fill-muted-foreground text-[10px] font-medium select-none">Right</text>
+        <text x={CENTER} y={DIAL_SIZE - 2} textAnchor="middle" className="fill-muted-foreground text-[10px] font-medium select-none">Down</text>
+        <text x={6} y={CENTER + 3} textAnchor="start" className="fill-muted-foreground text-[10px] font-medium select-none">Left</text>
+
+        {/* Center dot */}
+        <circle cx={CENTER} cy={CENTER} r={3} className="fill-muted-foreground/40" />
+
+        {hasValue && (
+          <>
+            {/* Line from center to handle */}
+            <line
+              x1={CENTER}
+              y1={CENTER}
+              x2={handleX}
+              y2={handleY}
+              className="stroke-primary"
+              strokeWidth={2}
+              strokeLinecap="round"
+            />
+
+            {/* Handle circle */}
+            <circle
+              cx={handleX}
+              cy={handleY}
+              r={HANDLE_RADIUS}
+              className="fill-primary stroke-background"
+              strokeWidth={2}
+            />
+          </>
+        )}
+      </svg>
+
+      {/* Degrees readout + clear */}
+      <div className="flex items-center gap-2">
+        <p className="text-xs text-muted-foreground tabular-nums">
+          {hasValue ? `${angleDeg}°` : 'Not set'}
+        </p>
+        {hasValue && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-5 w-5"
+            onClick={() => onChange(undefined)}
+            title="Clear orientation"
+          >
+            <X className="h-3 w-3" />
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// --- Direction selector components (per-face) ---
 
 function DirectionButton({
   direction,
@@ -213,12 +363,10 @@ function SideDetails({
         </div>
       )}
 
-      <Separator />
-
-      {/* Direction Section */}
+      {/* Sign Face Direction Section */}
       <div className="space-y-2">
         <div>
-          <Label className="text-xs text-muted-foreground">Direction</Label>
+          <Label className="text-xs text-muted-foreground">Sign Face Direction</Label>
           <p className="text-[11px] text-muted-foreground/70 mt-0.5 leading-snug">
             Direction is from the viewer&apos;s perspective in real life, not the map orientation. The arrow on the canvas may appear different from the actual direction.
           </p>
@@ -386,6 +534,20 @@ export function SignDetailsPanel({
               ))}
             </SelectContent>
           </Select>
+        </div>
+
+        {/* Sign Holder Orientation (annotation-level) */}
+        <div className="space-y-2">
+          <div>
+            <Label className="text-xs text-muted-foreground">Sign Holder Orientation</Label>
+            <p className="text-[11px] text-muted-foreground/70 mt-0.5 leading-snug">
+              How the physical sign holder is oriented in real life.
+            </p>
+          </div>
+          <OrientationDial
+            value={annotation.orientation}
+            onChange={(orientation) => onUpdate({ orientation })}
+          />
         </div>
 
         <Separator />

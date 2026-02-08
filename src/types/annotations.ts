@@ -57,6 +57,8 @@ export interface Annotation {
   createdAt: number;
   // Sign-specific optional properties
   signHolder?: SignHolderType;
+  // Stand orientation in degrees (0-360), 0 = North. Annotation-level (shared across faces).
+  orientation?: number;
   side1?: SignSide;  // Side 1 details
   side2?: SignSide;  // Side 2 details (only used if holder is 2-sided)
   // Signage type - parent category name like "Tickets", "Washroom", "Elevators"

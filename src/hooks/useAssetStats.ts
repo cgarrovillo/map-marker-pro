@@ -89,6 +89,7 @@ export interface StandRow {
   annotationId: string;
   label: string;
   holderType: SignHolderType;
+  orientation: number | undefined;
   status: StandStatus;
   notes: string | undefined;
   annotation: Annotation;
@@ -334,6 +335,7 @@ export function useAssetStats(
       annotationId: a.id,
       label: getDisplayLabel(a),
       holderType: getEffectiveHolder(a),
+      orientation: a.orientation,
       status: getEffectiveStandStatus(a),
       notes: a.notes,
       annotation: a,

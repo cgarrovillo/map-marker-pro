@@ -978,6 +978,41 @@ export function Canvas({
                             className="w-4 h-4 rounded-full border-2 border-white"
                             style={{ backgroundColor: color, boxShadow: '0 1px 3px rgba(0,0,0,0.3)' }}
                           />
+                          {/* Orientation indicator — line extending from dot center */}
+                          {annotation.orientation !== undefined && (() => {
+                            const orientRad = (annotation.orientation * Math.PI) / 180;
+                            const dx = 16 * Math.sin(orientRad);
+                            const dy = -16 * Math.cos(orientRad);
+                            // 2-sided: diameter line spanning both directions; 1-sided: radius from center
+                            const lx1 = isTwoSided ? 18 - dx : 18;
+                            const ly1 = isTwoSided ? 18 - dy : 18;
+                            const lx2 = 18 + dx;
+                            const ly2 = 18 + dy;
+                            return (
+                              <svg
+                                className="absolute pointer-events-none"
+                                width="36"
+                                height="36"
+                                viewBox="0 0 36 36"
+                                style={{
+                                  left: '50%',
+                                  top: '50%',
+                                  transform: 'translate(-50%, -50%)',
+                                }}
+                              >
+                                <line
+                                  x1={lx1}
+                                  y1={ly1}
+                                  x2={lx2}
+                                  y2={ly2}
+                                  stroke="white"
+                                  strokeWidth="2"
+                                  strokeLinecap="round"
+                                  style={{ filter: 'drop-shadow(0 0 1px rgba(0,0,0,0.6))' }}
+                                />
+                              </svg>
+                            );
+                          })()}
                           {/* Labels - stacked for 2-sided signs */}
                           <div className="absolute left-1/2 -translate-x-1/2 top-6 flex flex-col items-center gap-1">
                             {renderLabel(side1Data, label)}
