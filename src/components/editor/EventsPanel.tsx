@@ -1,5 +1,22 @@
 import { useState } from 'react';
-import { Plus, Calendar, Trash2, MoreHorizontal, Edit2, Loader2 } from 'lucide-react';
+import { Plus, Calendar, Trash2, MoreHorizontal, Edit2, Loader2, GripVertical } from 'lucide-react';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -28,7 +45,94 @@ interface EventsPanelProps {
   onCreateEvent: (name: string) => void;
   onDeleteEvent: (id: string) => void;
   onRenameEvent: (id: string, name: string) => void;
+  onReorderEvents: (reorderedEvents: Event[]) => void;
   loading?: boolean;
+}
+
+interface SortableEventItemProps {
+  event: Event;
+  isActive: boolean;
+  onSelect: () => void;
+  onStartRename: (event: Event) => void;
+  onDelete: (id: string) => void;
+  formatDate: (dateString: string) => string;
+}
+
+function SortableEventItem({
+  event,
+  isActive,
+  onSelect,
+  onStartRename,
+  onDelete,
+  formatDate,
+}: SortableEventItemProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: event.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        'group flex items-center gap-1 px-2 py-2 rounded-lg cursor-pointer transition-all',
+        isDragging && 'opacity-50 z-50 shadow-lg',
+        isActive
+          ? 'bg-primary/20 border border-primary/30'
+          : 'hover:bg-secondary border border-transparent'
+      )}
+      onClick={onSelect}
+    >
+      <button
+        className="shrink-0 cursor-grab active:cursor-grabbing touch-none text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+        {...attributes}
+        {...listeners}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <GripVertical className="w-4 h-4" />
+      </button>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium truncate">{event.name}</p>
+        <p className="text-xs text-muted-foreground">
+          Created {formatDate(event.created_at)}
+        </p>
+      </div>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+          >
+            <MoreHorizontal className="w-4 h-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onClick={() => onStartRename(event)}>
+            <Edit2 className="w-4 h-4 mr-2" />
+            Rename
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            className="text-destructive"
+            onClick={() => onDelete(event.id)}
+          >
+            <Trash2 className="w-4 h-4 mr-2" />
+            Delete
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+  );
 }
 
 export function EventsPanel({
@@ -38,12 +142,24 @@ export function EventsPanel({
   onCreateEvent,
   onDeleteEvent,
   onRenameEvent,
+  onReorderEvents,
   loading = false,
 }: EventsPanelProps) {
   const [isCreating, setIsCreating] = useState(false);
   const [newEventName, setNewEventName] = useState('');
   const [renamingEventId, setRenamingEventId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 5,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   const handleCreate = () => {
     if (newEventName.trim()) {
@@ -71,6 +187,16 @@ export function EventsPanel({
       month: 'short',
       day: 'numeric',
     });
+  };
+
+  const handleDragEnd = (dragEvent: DragEndEvent) => {
+    const { active, over } = dragEvent;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = events.findIndex((e) => e.id === active.id);
+    const newIndex = events.findIndex((e) => e.id === over.id);
+    const reordered = arrayMove(events, oldIndex, newIndex);
+    onReorderEvents(reordered);
   };
 
   return (
@@ -111,49 +237,28 @@ export function EventsPanel({
               </p>
             </div>
           ) : (
-            events.map((event) => (
-              <div
-                key={event.id}
-                className={cn(
-                  'group flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-all',
-                  activeEventId === event.id
-                    ? 'bg-primary/20 border border-primary/30'
-                    : 'hover:bg-secondary border border-transparent'
-                )}
-                onClick={() => onSelectEvent(event.id)}
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext
+                items={events.map((e) => e.id)}
+                strategy={verticalListSortingStrategy}
               >
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{event.name}</p>
-                  <p className="text-xs text-muted-foreground">
-                    Created {formatDate(event.created_at)}
-                  </p>
-                </div>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      <MoreHorizontal className="w-4 h-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => startRename(event)}>
-                      <Edit2 className="w-4 h-4 mr-2" />
-                      Rename
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      className="text-destructive"
-                      onClick={() => onDeleteEvent(event.id)}
-                    >
-                      <Trash2 className="w-4 h-4 mr-2" />
-                      Delete
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            ))
+                {events.map((event) => (
+                  <SortableEventItem
+                    key={event.id}
+                    event={event}
+                    isActive={activeEventId === event.id}
+                    onSelect={() => onSelectEvent(event.id)}
+                    onStartRename={startRename}
+                    onDelete={onDeleteEvent}
+                    formatDate={formatDate}
+                  />
+                ))}
+              </SortableContext>
+            </DndContext>
           )}
         </div>
       </ScrollArea>

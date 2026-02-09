@@ -45,6 +45,7 @@ export function FloorPlanEditor() {
     createEvent,
     deleteEvent,
     renameEvent,
+    reorderEvents,
   } = useSupabaseEvents();
 
   const {
@@ -300,6 +301,18 @@ export function FloorPlanEditor() {
     [renameEvent]
   );
 
+  const handleReorderEvents = useCallback(
+    async (reorderedEvents: typeof events) => {
+      try {
+        await reorderEvents(reorderedEvents);
+      } catch (error) {
+        toast.error('Failed to reorder events');
+        console.error(error);
+      }
+    },
+    [reorderEvents]
+  );
+
   const handleSignOut = async () => {
     try {
       await signOut();
@@ -483,6 +496,7 @@ export function FloorPlanEditor() {
           onCreateEvent={handleCreateEvent}
           onDeleteEvent={handleDeleteEvent}
           onRenameEvent={handleRenameEvent}
+          onReorderEvents={handleReorderEvents}
           loading={eventsLoading}
         />
 

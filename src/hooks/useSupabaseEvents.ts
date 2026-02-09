@@ -32,7 +32,7 @@ export function useSupabaseEvents() {
         .from('events')
         .select('*')
         .eq('organization_id', organization.id)
-        .order('created_at', { ascending: false });
+        .order('sort_order', { ascending: true });
 
       if (error) {
         console.error('[useSupabaseEvents] Error fetching events:', error);
@@ -58,11 +58,17 @@ export function useSupabaseEvents() {
         },
         (payload) => {
           if (payload.eventType === 'INSERT') {
-            setEvents((prev) => [payload.new as Event, ...prev]);
+            setEvents((prev) => {
+              const updated = [...prev, payload.new as Event];
+              return updated.sort((a, b) => a.sort_order - b.sort_order);
+            });
           } else if (payload.eventType === 'UPDATE') {
-            setEvents((prev) =>
-              prev.map((e) => (e.id === payload.new.id ? (payload.new as Event) : e))
-            );
+            setEvents((prev) => {
+              const updated = prev.map((e) =>
+                e.id === payload.new.id ? (payload.new as Event) : e
+              );
+              return updated.sort((a, b) => a.sort_order - b.sort_order);
+            });
           } else if (payload.eventType === 'DELETE') {
             setEvents((prev) => prev.filter((e) => e.id !== payload.old.id));
             if (activeEventId === payload.old.id) {
@@ -87,9 +93,15 @@ export function useSupabaseEvents() {
         throw new Error('No organization found. Please ensure you are logged in and have an organization set up.');
       }
 
+      // New events get placed at the end of the list
+      const maxSortOrder = events.length > 0
+        ? Math.max(...events.map((e) => e.sort_order))
+        : -1;
+
       const newEvent: EventInsert = {
         organization_id: organization.id,
         name,
+        sort_order: maxSortOrder + 1,
       };
 
       console.log('[useSupabaseEvents] Inserting event:', newEvent);
@@ -109,7 +121,7 @@ export function useSupabaseEvents() {
       setActiveEventId(data.id);
       return data;
     },
-    [organization]
+    [organization, events]
   );
 
   const deleteEvent = useCallback(
@@ -155,6 +167,41 @@ export function useSupabaseEvents() {
     return data;
   }, []);
 
+  const reorderEvents = useCallback(
+    async (reorderedEvents: Event[]) => {
+      // Optimistically update local state
+      setEvents(reorderedEvents);
+
+      // Batch update sort_order in the database
+      const updates = reorderedEvents.map((event, index) => ({
+        id: event.id,
+        sort_order: index,
+      }));
+
+      for (const update of updates) {
+        const { error } = await supabase
+          .from('events')
+          .update({ sort_order: update.sort_order })
+          .eq('id', update.id);
+
+        if (error) {
+          console.error('Error updating event sort order:', error);
+          // Refetch to recover from partial failure
+          if (organization) {
+            const { data } = await supabase
+              .from('events')
+              .select('*')
+              .eq('organization_id', organization.id)
+              .order('sort_order', { ascending: true });
+            if (data) setEvents(data);
+          }
+          throw error;
+        }
+      }
+    },
+    [organization]
+  );
+
   return {
     events,
     activeEvent,
@@ -165,5 +212,6 @@ export function useSupabaseEvents() {
     deleteEvent,
     renameEvent,
     updateEvent,
+    reorderEvents,
   };
 }

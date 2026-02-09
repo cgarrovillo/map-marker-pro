@@ -11,9 +11,15 @@ import {
 import { SignTable, StandTable, DesignTable } from './AssetTable';
 import { useAssetStats } from '@/hooks/useAssetStats';
 import type { SignFilters, StandFilters, DesignFilters } from '@/hooks/useAssetStats';
-import { Package } from 'lucide-react';
+import { Download, Package } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  exportSignTableCsv,
+  exportDesignTableCsv,
+  exportStandTableCsv,
+} from '@/lib/csvExport';
 import type { Annotation } from '@/types/annotations';
 import type { Tables } from '@/integrations/supabase/types';
 
@@ -97,11 +103,22 @@ export function AssetsDashboard({
           <TabsContent value="designs" className="space-y-6">
             <DesignSummaryCards stats={designStats} />
 
-            <DesignFilterBar
-              filters={designFilters}
-              onFiltersChange={setDesignFilters}
-              signageTypeNames={signageTypeNames}
-            />
+            <div className="flex items-start justify-between gap-4">
+              <DesignFilterBar
+                filters={designFilters}
+                onFiltersChange={setDesignFilters}
+                signageTypeNames={signageTypeNames}
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={filteredDesignRows.length === 0}
+                onClick={() => exportDesignTableCsv(filteredDesignRows)}
+              >
+                <Download className="mr-2 h-4 w-4" />
+                Export CSV
+              </Button>
+            </div>
 
             <DesignTable
               rows={filteredDesignRows}
@@ -113,11 +130,22 @@ export function AssetsDashboard({
           <TabsContent value="signs" className="space-y-6">
             <SignSummaryCards stats={signStats} />
 
-            <SignFilterBar
-              filters={signFilters}
-              onFiltersChange={setSignFilters}
-              signageTypeNames={signageTypeNames}
-            />
+            <div className="flex items-start justify-between gap-4">
+              <SignFilterBar
+                filters={signFilters}
+                onFiltersChange={setSignFilters}
+                signageTypeNames={signageTypeNames}
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={filteredSignGroupRows.length === 0}
+                onClick={() => exportSignTableCsv(filteredSignGroupRows)}
+              >
+                <Download className="mr-2 h-4 w-4" />
+                Export CSV
+              </Button>
+            </div>
 
             <SignTable
               rows={filteredSignGroupRows}
@@ -129,10 +157,21 @@ export function AssetsDashboard({
           <TabsContent value="stands" className="space-y-6">
             <StandSummaryCards stats={standStats} />
 
-            <StandFilterBar
-              filters={standFilters}
-              onFiltersChange={setStandFilters}
-            />
+            <div className="flex items-start justify-between gap-4">
+              <StandFilterBar
+                filters={standFilters}
+                onFiltersChange={setStandFilters}
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={filteredStandRows.length === 0}
+                onClick={() => exportStandTableCsv(filteredStandRows)}
+              >
+                <Download className="mr-2 h-4 w-4" />
+                Export CSV
+              </Button>
+            </div>
 
             <StandTable
               rows={filteredStandRows}
