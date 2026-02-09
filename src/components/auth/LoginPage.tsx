@@ -17,6 +17,12 @@ export function LoginPage() {
     e.preventDefault();
     setLoading(true);
 
+    if (!email.toLowerCase().endsWith('@showpass.com')) {
+      toast.success('Check your email for further instructions.');
+      setLoading(false);
+      return;
+    }
+
     try {
       const { error } = await supabase.auth.signInWithPassword({
         email,

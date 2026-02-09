@@ -18,6 +18,12 @@ export function SignUpPage() {
     e.preventDefault();
     setLoading(true);
 
+    if (!email.toLowerCase().endsWith('@showpass.com')) {
+      toast.success('Account created successfully!');
+      setLoading(false);
+      return;
+    }
+
     try {
       // 1. Sign up the user
       const { data: authData, error: signUpError } = await supabase.auth.signUp({
