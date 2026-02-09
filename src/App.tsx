@@ -33,6 +33,11 @@ const App = () => (
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
+          <img
+            src="/labs-logo.svg"
+            alt="Labs logo"
+            className="fixed bottom-4 left-4 z-50 h-10 pointer-events-none opacity-80"
+          />
         </BrowserRouter>
       </TooltipProvider>
     </AuthProvider>
