@@ -329,6 +329,45 @@ export function useVenueLayouts(eventId: string | null) {
     [layouts]
   );
 
+  const batchUpdateAnnotations = useCallback(
+    async (layoutId: string, updatesById: Record<string, Partial<Annotation>>) => {
+      const layout = layouts.find((l) => l.id === layoutId);
+      if (!layout) return;
+
+      const currentAnnotations = getAnnotations(layout);
+      const updatedAnnotations = currentAnnotations.map((a) => {
+        const patch = updatesById[a.id];
+        return patch ? { ...a, ...patch } : a;
+      });
+
+      setLayouts((prev) =>
+        prev.map((l) =>
+          l.id === layoutId
+            ? { ...l, annotations: updatedAnnotations as unknown as Json }
+            : l
+        )
+      );
+
+      const { error } = await supabase
+        .from('venue_layouts')
+        .update({ annotations: updatedAnnotations as unknown as Json })
+        .eq('id', layoutId);
+
+      if (error) {
+        console.error('Error batch-updating annotations:', error);
+        setLayouts((prev) =>
+          prev.map((l) =>
+            l.id === layoutId
+              ? { ...l, annotations: currentAnnotations as unknown as Json }
+              : l
+          )
+        );
+        throw error;
+      }
+    },
+    [layouts]
+  );
+
   const clearAnnotations = useCallback(async (layoutId: string) => {
     const { error } = await supabase
       .from('venue_layouts')
@@ -365,6 +404,7 @@ export function useVenueLayouts(eventId: string | null) {
     addAnnotation,
     deleteAnnotation,
     updateAnnotation,
+    batchUpdateAnnotations,
     clearAnnotations,
     renameLayout,
     getAnnotations,

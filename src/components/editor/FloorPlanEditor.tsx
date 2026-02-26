@@ -58,6 +58,7 @@ export function FloorPlanEditor() {
     addAnnotation,
     deleteAnnotation,
     updateAnnotation,
+    batchUpdateAnnotations,
     clearAnnotations,
     getAnnotations,
     getImageUrl,
@@ -190,6 +191,19 @@ export function FloorPlanEditor() {
       }
     },
     [activeLayoutId, updateAnnotation]
+  );
+
+  const handleBatchUpdateAnnotations = useCallback(
+    async (updatesById: Record<string, Partial<Annotation>>) => {
+      if (!activeLayoutId) return;
+      try {
+        await batchUpdateAnnotations(activeLayoutId, updatesById);
+      } catch (error) {
+        toast.error('Failed to update annotations');
+        console.error(error);
+      }
+    },
+    [activeLayoutId, batchUpdateAnnotations]
   );
 
   const handleExport = useCallback(() => {
@@ -504,6 +518,7 @@ export function FloorPlanEditor() {
           <AssetsDashboard
             annotations={annotations}
             onUpdateAnnotation={handleUpdateAnnotation}
+            onBatchUpdateAnnotations={handleBatchUpdateAnnotations}
             activeLayout={activeLayout}
             activeEvent={activeEvent}
             signageTypes={signageTypes}

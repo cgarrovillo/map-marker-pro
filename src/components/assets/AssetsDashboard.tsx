@@ -29,6 +29,7 @@ type SignageSubTypeRow = Tables<'signage_sub_types'>;
 interface AssetsDashboardProps {
   annotations: Annotation[];
   onUpdateAnnotation: (id: string, updates: Partial<Annotation>) => Promise<void>;
+  onBatchUpdateAnnotations: (updatesById: Record<string, Partial<Annotation>>) => Promise<void>;
   activeLayout: Tables<'venue_layouts'> | null;
   activeEvent: Tables<'events'> | null;
   signageTypes?: SignageTypeRow[];
@@ -38,6 +39,7 @@ interface AssetsDashboardProps {
 export function AssetsDashboard({
   annotations,
   onUpdateAnnotation,
+  onBatchUpdateAnnotations,
   activeLayout,
   activeEvent,
   signageTypes = [],
@@ -122,7 +124,7 @@ export function AssetsDashboard({
 
             <DesignTable
               rows={filteredDesignRows}
-              onUpdateAnnotation={onUpdateAnnotation}
+              onBatchUpdateAnnotations={onBatchUpdateAnnotations}
             />
           </TabsContent>
 
@@ -149,7 +151,7 @@ export function AssetsDashboard({
 
             <SignTable
               rows={filteredSignGroupRows}
-              onUpdateAnnotation={onUpdateAnnotation}
+              onBatchUpdateAnnotations={onBatchUpdateAnnotations}
             />
           </TabsContent>
 

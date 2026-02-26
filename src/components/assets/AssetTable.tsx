@@ -55,37 +55,24 @@ function formatType(typeName?: string, subTypeName?: string): string {
 
 interface SignTableProps {
   rows: SignGroupRow[];
-  onUpdateAnnotation: (id: string, updates: Partial<Annotation>) => Promise<void>;
+  onBatchUpdateAnnotations: (updatesById: Record<string, Partial<Annotation>>) => Promise<void>;
 }
 
-/** Bulk-update signStatus for every face in the group. */
-function bulkUpdateSignStatus(
+function buildSignStatusBatch(
   faces: FaceRef[],
   newStatus: SignStatus,
-  onUpdateAnnotation: (id: string, updates: Partial<Annotation>) => Promise<void>,
-) {
-  // Deduplicate by annotation ID and batch the updates
-  const byAnnotation = new Map<string, FaceRef[]>();
+): Record<string, Partial<Annotation>> {
+  const batch: Record<string, Partial<Annotation>> = {};
   for (const f of faces) {
-    const arr = byAnnotation.get(f.annotationId) ?? [];
-    arr.push(f);
-    byAnnotation.set(f.annotationId, arr);
+    const existing = batch[f.annotationId] ?? {};
+    const sideKey = f.side === 1 ? 'side1' : 'side2';
+    (existing as Record<string, unknown>)[sideKey] = { signStatus: newStatus };
+    batch[f.annotationId] = existing;
   }
-
-  for (const [annotationId, refs] of byAnnotation) {
-    const updates: Partial<Annotation> = {};
-    for (const ref of refs) {
-      const sideKey = ref.side === 1 ? 'side1' : 'side2';
-      // We merge per-side; since the annotation update is a shallow merge,
-      // we build the side object here. The caller's update handler should
-      // handle merging nested objects.
-      (updates as Record<string, unknown>)[sideKey] = { signStatus: newStatus };
-    }
-    onUpdateAnnotation(annotationId, updates);
-  }
+  return batch;
 }
 
-export function SignTable({ rows, onUpdateAnnotation }: SignTableProps) {
+export function SignTable({ rows, onBatchUpdateAnnotations }: SignTableProps) {
   if (rows.length === 0) {
     return <EmptyState entity="signs" />;
   }
@@ -114,7 +101,7 @@ export function SignTable({ rows, onUpdateAnnotation }: SignTableProps) {
                 <Select
                   value={row.status}
                   onValueChange={(value) =>
-                    bulkUpdateSignStatus(row.faces, value as SignStatus, onUpdateAnnotation)
+                    onBatchUpdateAnnotations(buildSignStatusBatch(row.faces, value as SignStatus))
                   }
                 >
                   <SelectTrigger className="w-[150px] h-8 border-none bg-transparent p-0 focus:ring-0">
@@ -148,33 +135,24 @@ export function SignTable({ rows, onUpdateAnnotation }: SignTableProps) {
 
 interface DesignTableProps {
   rows: DesignRow[];
-  onUpdateAnnotation: (id: string, updates: Partial<Annotation>) => Promise<void>;
+  onBatchUpdateAnnotations: (updatesById: Record<string, Partial<Annotation>>) => Promise<void>;
 }
 
-/** Bulk-update designStatus for every face in the group. */
-function bulkUpdateDesignStatus(
+function buildDesignStatusBatch(
   faces: FaceRef[],
   newStatus: DesignStatus,
-  onUpdateAnnotation: (id: string, updates: Partial<Annotation>) => Promise<void>,
-) {
-  const byAnnotation = new Map<string, FaceRef[]>();
+): Record<string, Partial<Annotation>> {
+  const batch: Record<string, Partial<Annotation>> = {};
   for (const f of faces) {
-    const arr = byAnnotation.get(f.annotationId) ?? [];
-    arr.push(f);
-    byAnnotation.set(f.annotationId, arr);
+    const existing = batch[f.annotationId] ?? {};
+    const sideKey = f.side === 1 ? 'side1' : 'side2';
+    (existing as Record<string, unknown>)[sideKey] = { designStatus: newStatus };
+    batch[f.annotationId] = existing;
   }
-
-  for (const [annotationId, refs] of byAnnotation) {
-    const updates: Partial<Annotation> = {};
-    for (const ref of refs) {
-      const sideKey = ref.side === 1 ? 'side1' : 'side2';
-      (updates as Record<string, unknown>)[sideKey] = { designStatus: newStatus };
-    }
-    onUpdateAnnotation(annotationId, updates);
-  }
+  return batch;
 }
 
-export function DesignTable({ rows, onUpdateAnnotation }: DesignTableProps) {
+export function DesignTable({ rows, onBatchUpdateAnnotations }: DesignTableProps) {
   if (rows.length === 0) {
     return <EmptyState entity="designs" />;
   }
@@ -201,7 +179,7 @@ export function DesignTable({ rows, onUpdateAnnotation }: DesignTableProps) {
                 <Select
                   value={row.designStatus}
                   onValueChange={(value) =>
-                    bulkUpdateDesignStatus(row.faces, value as DesignStatus, onUpdateAnnotation)
+                    onBatchUpdateAnnotations(buildDesignStatusBatch(row.faces, value as DesignStatus))
                   }
                 >
                   <SelectTrigger className="w-[150px] h-8 border-none bg-transparent p-0 focus:ring-0">
