@@ -36,8 +36,8 @@ interface SignDetailsPanelProps {
   subTypesByParent?: Record<string, SignageSubTypeRow[]>;
 }
 
-// Direction button positions in a 3x3 grid compass layout
-const DIRECTION_POSITIONS: Record<SignDirection, { row: number; col: number }> = {
+// Direction button positions in a 3x3 grid compass layout (only cardinal + diagonal directions have positions)
+const DIRECTION_POSITIONS: Partial<Record<SignDirection, { row: number; col: number }>> = {
   'up-left': { row: 0, col: 0 },
   'up': { row: 0, col: 1 },
   'up-right': { row: 0, col: 2 },

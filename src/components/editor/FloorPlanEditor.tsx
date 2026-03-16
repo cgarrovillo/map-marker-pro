@@ -348,6 +348,11 @@ export function FloorPlanEditor() {
 
   return (
     <div className="h-screen flex flex-col bg-background">
+      {/* TODO Banner */}
+      <div className="bg-[hsl(38,92%,50%)] text-[hsl(45,93%,5%)] px-4 py-1.5 text-sm font-medium text-center">
+        todo: fix assets + map data modeling
+      </div>
+
       <header className="h-12 bg-card border-b border-border flex items-center px-4">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
